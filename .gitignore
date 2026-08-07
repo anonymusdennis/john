@@ -1,0 +1,37 @@
+# Godot 4+
+.godot/
+*.translation
+
+# Godot-specific
+export.cfg
+export_presets.cfg
+
+# Imported assets
+.import/
+*.import
+
+# Mono / C#
+.mono/
+data_*/
+mono_crash.*.json
+
+# OS
+.DS_Store
+Thumbs.db
+*~
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Builds
+build/
+exports/
+*.pck
+*.exe
+*.x86_64
+*.app
+*.apk
+*.aab
