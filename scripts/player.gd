@@ -1,6 +1,8 @@
 extends CharacterBody3D
-## Third-person 3D platformer controller with sprint, crouch, coyote jump,
+## First/third-person 3D platformer controller with sprint, crouch, coyote jump,
 ## jump buffering, and automatic vaulting onto grabbable ledges while ascending.
+
+enum CameraMode { FIRST_PERSON, THIRD_PERSON }
 
 const GROUP_GRABBABLE := &"grabbable"
 
@@ -26,11 +28,18 @@ const GROUP_GRABBABLE := &"grabbable"
 @export var crouch_transition_speed: float = 12.0
 
 @export_group("Camera")
+@export var camera_mode: CameraMode = CameraMode.FIRST_PERSON
 @export var mouse_sensitivity: float = 0.0025
 @export var gamepad_look_sensitivity: float = 2.5
-@export var min_pitch: float = -1.2
-@export var max_pitch: float = 0.55
+@export var min_pitch: float = -1.5707963
+@export var max_pitch: float = 1.5707963
 @export var camera_distance: float = 5.5
+@export var first_person_eye_ratio: float = 0.88
+@export var third_person_pivot_ratio: float = 0.78
+
+@export_group("Physics Push")
+@export var push_strength: float = 14.0
+@export var push_min_player_speed: float = 0.15
 
 @export_group("Vault")
 @export var vault_enabled: bool = true
@@ -62,14 +71,29 @@ var _vault_cooldown_timer: float = 0.0
 var _vault_tween: Tween
 
 
+const GrenadeProjectile = preload("res://scripts/grenade_projectile.gd")
+const PhysicsObject = preload("res://scripts/physics_object.gd")
+
+var _throw_cooldown: float = 0.0
+
+
 func _ready() -> void:
+	add_to_group("player")
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	_capsule = collision_shape.shape as CapsuleShape3D
-	spring_arm.spring_length = camera_distance
 	_configure_vault_rays()
+	_apply_camera_mode()
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if Inventory.is_open:
+		return
+
+	if event.is_action_pressed("toggle_camera_view"):
+		_toggle_camera_mode()
+		get_viewport().set_input_as_handled()
+		return
+
 	if event.is_action_pressed("toggle_mouse_capture"):
 		if Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 			Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
@@ -81,6 +105,11 @@ func _unhandled_input(event: InputEvent) -> void:
 	if Input.mouse_mode != Input.MOUSE_MODE_CAPTURED:
 		return
 
+	if event.is_action_pressed("use_item"):
+		_try_use_selected_item()
+		get_viewport().set_input_as_handled()
+		return
+
 	if event is InputEventMouseMotion:
 		_look(event.relative.x * mouse_sensitivity, event.relative.y * mouse_sensitivity)
 		get_viewport().set_input_as_handled()
@@ -88,11 +117,13 @@ func _unhandled_input(event: InputEvent) -> void:
 
 func _physics_process(delta: float) -> void:
 	_vault_cooldown_timer = maxf(_vault_cooldown_timer - delta, 0.0)
+	_throw_cooldown = maxf(_throw_cooldown - delta, 0.0)
 
 	if _is_vaulting:
 		return
 
-	_apply_gamepad_look(delta)
+	if not Inventory.is_open:
+		_apply_gamepad_look(delta)
 	_update_floor_timers(delta)
 	_update_crouch(delta)
 	_apply_gravity(delta)
@@ -100,11 +131,98 @@ func _physics_process(delta: float) -> void:
 	_handle_move(delta)
 
 	move_and_slide()
+	_push_physics_objects(delta)
 
 	if vault_enabled:
 		_try_auto_vault()
 
 	_was_on_floor = is_on_floor()
+
+
+func _try_use_selected_item() -> void:
+	if _throw_cooldown > 0.0:
+		return
+	var stack := Inventory.get_selected_stack()
+	if Inventory.is_slot_empty(stack):
+		return
+	var id: StringName = stack["id"]
+	if not ItemDef.is_usable(id):
+		return
+	if id == ItemDef.GRENADE:
+		if not Inventory.consume_selected(1):
+			return
+		_throw_grenade()
+		_throw_cooldown = 0.35
+
+
+func _throw_grenade() -> void:
+	var grenade := RigidBody3D.new()
+	grenade.set_script(GrenadeProjectile)
+	var origin := global_position + Vector3.UP * 1.35 - global_transform.basis.z * 0.6
+	var aim := -camera.global_transform.basis.z
+	get_tree().current_scene.add_child(grenade)
+	grenade.global_position = origin
+	var force := ItemDef.throw_force(ItemDef.GRENADE)
+	grenade.linear_velocity = velocity * 0.35 + aim * force + Vector3.UP * 2.5
+	grenade.angular_velocity = Vector3(randf_range(-8, 8), randf_range(-8, 8), randf_range(-8, 8))
+
+
+func _toggle_camera_mode() -> void:
+	camera_mode = CameraMode.THIRD_PERSON if camera_mode == CameraMode.FIRST_PERSON else CameraMode.FIRST_PERSON
+	_apply_camera_mode()
+
+
+func _push_physics_objects(delta: float) -> void:
+	var player_horiz := Vector3(velocity.x, 0.0, velocity.z)
+	var player_speed := player_horiz.length()
+	if player_speed < push_min_player_speed:
+		return
+
+	var push_dir := player_horiz / player_speed
+	var max_push_speed := player_speed * 0.5
+
+	for i in get_slide_collision_count():
+		var collision := get_slide_collision(i)
+		var collider := collision.get_collider()
+		if collider is RigidBody3D:
+			_apply_push_to_body(collider as RigidBody3D, collision, push_dir, max_push_speed, delta)
+
+
+func _apply_push_to_body(
+	body: RigidBody3D,
+	collision: KinematicCollision3D,
+	push_dir: Vector3,
+	max_push_speed: float,
+	delta: float,
+) -> void:
+	var normal := collision.get_normal()
+	if push_dir.dot(normal) >= 0.0:
+		return
+
+	var weight: float = PhysicsObject.get_weight(body)
+	var body_horiz := Vector3(body.linear_velocity.x, 0.0, body.linear_velocity.z)
+	var target := push_dir * max_push_speed
+	var responsiveness: float = push_strength / weight
+	var new_horiz := body_horiz.move_toward(target, responsiveness * delta)
+
+	if new_horiz.length() > max_push_speed:
+		new_horiz = new_horiz.normalized() * max_push_speed
+
+	body.linear_velocity.x = new_horiz.x
+	body.linear_velocity.z = new_horiz.z
+
+
+func _apply_camera_mode() -> void:
+	var first_person := camera_mode == CameraMode.FIRST_PERSON
+	spring_arm.spring_length = 0.0 if first_person else camera_distance
+	spring_arm.collision_mask = 0 if first_person else 1
+	mesh.visible = not first_person
+	_update_camera_pivot_height()
+
+
+func _update_camera_pivot_height() -> void:
+	var ratio := first_person_eye_ratio if camera_mode == CameraMode.FIRST_PERSON else third_person_pivot_ratio
+	pivot.position.y = _capsule.height * ratio
 
 
 func _look(yaw: float, pitch: float) -> void:
@@ -200,6 +318,8 @@ func _update_crouch(delta: float) -> void:
 		visual.height = _capsule.height
 		visual.radius = _capsule.radius
 		mesh.position.y = _capsule.height * 0.5
+
+	_update_camera_pivot_height()
 
 
 func _can_stand() -> bool:

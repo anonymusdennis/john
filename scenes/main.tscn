@@ -1,8 +1,8 @@
-[gd_scene load_steps=20 format=3 uid="uid://bmainscenejohn01"]
+[gd_scene load_steps=8 format=3]
 
 [ext_resource type="PackedScene" path="res://scenes/player.tscn" id="1_player"]
-[ext_resource type="Script" path="res://scripts/grabbable_ledge.gd" id="2_ledge"]
-[ext_resource type="Script" path="res://scripts/hud.gd" id="3_hud"]
+[ext_resource type="Script" path="res://scripts/world_builder.gd" id="2_world"]
+[ext_resource type="Script" path="res://scripts/inventory_ui.gd" id="3_invui"]
 
 [sub_resource type="ProceduralSkyMaterial" id="SkyMat"]
 sky_top_color = Color(0.35, 0.55, 0.85, 1)
@@ -23,65 +23,20 @@ tonemap_mode = 2
 ssao_enabled = true
 glow_enabled = true
 glow_intensity = 0.3
+fog_enabled = true
+fog_light_color = Color(0.65, 0.72, 0.8, 1)
+fog_density = 0.0008
+fog_aerial_perspective = 0.35
+
+[sub_resource type="BoxMesh" id="Mesh_ground"]
+size = Vector3(120, 1, 120)
+
+[sub_resource type="BoxShape3D" id="Shape_ground"]
+size = Vector3(120, 1, 120)
 
 [sub_resource type="StandardMaterial3D" id="Mat_ground"]
 albedo_color = Color(0.22, 0.28, 0.24, 1)
 roughness = 0.95
-
-[sub_resource type="StandardMaterial3D" id="Mat_platform"]
-albedo_color = Color(0.45, 0.4, 0.35, 1)
-roughness = 0.85
-
-[sub_resource type="StandardMaterial3D" id="Mat_grabbable"]
-albedo_color = Color(0.85, 0.62, 0.25, 1)
-roughness = 0.55
-metallic = 0.15
-
-[sub_resource type="StandardMaterial3D" id="Mat_accent"]
-albedo_color = Color(0.3, 0.55, 0.7, 1)
-roughness = 0.7
-
-[sub_resource type="BoxMesh" id="Mesh_ground"]
-size = Vector3(80, 1, 80)
-
-[sub_resource type="BoxShape3D" id="Shape_ground"]
-size = Vector3(80, 1, 80)
-
-[sub_resource type="BoxMesh" id="Mesh_low"]
-size = Vector3(4, 1.2, 4)
-
-[sub_resource type="BoxShape3D" id="Shape_low"]
-size = Vector3(4, 1.2, 4)
-
-[sub_resource type="BoxMesh" id="Mesh_mid"]
-size = Vector3(4, 2.2, 4)
-
-[sub_resource type="BoxShape3D" id="Shape_mid"]
-size = Vector3(4, 2.2, 4)
-
-[sub_resource type="BoxMesh" id="Mesh_high"]
-size = Vector3(5, 3.2, 5)
-
-[sub_resource type="BoxShape3D" id="Shape_high"]
-size = Vector3(5, 3.2, 5)
-
-[sub_resource type="BoxMesh" id="Mesh_long"]
-size = Vector3(10, 1.5, 3)
-
-[sub_resource type="BoxShape3D" id="Shape_long"]
-size = Vector3(10, 1.5, 3)
-
-[sub_resource type="BoxMesh" id="Mesh_stair"]
-size = Vector3(2.5, 0.9, 2.5)
-
-[sub_resource type="BoxShape3D" id="Shape_stair"]
-size = Vector3(2.5, 0.9, 2.5)
-
-[sub_resource type="BoxMesh" id="Mesh_wall"]
-size = Vector3(6, 4, 1.2)
-
-[sub_resource type="BoxShape3D" id="Shape_wall"]
-size = Vector3(6, 4, 1.2)
 
 [node name="Main" type="Node3D"]
 
@@ -89,9 +44,10 @@ size = Vector3(6, 4, 1.2)
 environment = SubResource("Environment_main")
 
 [node name="Sun" type="DirectionalLight3D" parent="."]
-transform = Transform3D(0.866025, -0.353553, 0.353553, 0, 0.707107, 0.707107, -0.5, -0.612372, 0.612372, 8, 18, 10)
+transform = Transform3D(0.866025, -0.353553, 0.353553, 0, 0.707107, 0.707107, -0.5, -0.612372, 0.612372, 8, 40, 10)
 shadow_enabled = true
 light_energy = 1.15
+directional_shadow_max_distance = 80.0
 
 [node name="Ground" type="StaticBody3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)
@@ -105,140 +61,10 @@ surface_material_override/0 = SubResource("Mat_ground")
 shape = SubResource("Shape_ground")
 
 [node name="Player" parent="." instance=ExtResource("1_player")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.1, 8)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.1, 10)
 
-[node name="Level" type="Node3D" parent="."]
+[node name="WorldContent" type="Node3D" parent="."]
+script = ExtResource("2_world")
 
-[node name="VaultLedgeLow" type="StaticBody3D" parent="Level"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4, 0.6, -2)
-collision_layer = 5
-script = ExtResource("2_ledge")
-
-[node name="Mesh" type="MeshInstance3D" parent="Level/VaultLedgeLow"]
-mesh = SubResource("Mesh_low")
-surface_material_override/0 = SubResource("Mat_grabbable")
-
-[node name="Collision" type="CollisionShape3D" parent="Level/VaultLedgeLow"]
-shape = SubResource("Shape_low")
-
-[node name="VaultLedgeMid" type="StaticBody3D" parent="Level"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4, 1.1, -2)
-collision_layer = 5
-script = ExtResource("2_ledge")
-
-[node name="Mesh" type="MeshInstance3D" parent="Level/VaultLedgeMid"]
-mesh = SubResource("Mesh_mid")
-surface_material_override/0 = SubResource("Mat_grabbable")
-
-[node name="Collision" type="CollisionShape3D" parent="Level/VaultLedgeMid"]
-shape = SubResource("Shape_mid")
-
-[node name="VaultLedgeHigh" type="StaticBody3D" parent="Level"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.6, -8)
-collision_layer = 5
-script = ExtResource("2_ledge")
-
-[node name="Mesh" type="MeshInstance3D" parent="Level/VaultLedgeHigh"]
-mesh = SubResource("Mesh_high")
-surface_material_override/0 = SubResource("Mat_grabbable")
-
-[node name="Collision" type="CollisionShape3D" parent="Level/VaultLedgeHigh"]
-shape = SubResource("Shape_high")
-
-[node name="VaultWall" type="StaticBody3D" parent="Level"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10, 2, 2)
-collision_layer = 5
-script = ExtResource("2_ledge")
-
-[node name="Mesh" type="MeshInstance3D" parent="Level/VaultWall"]
-mesh = SubResource("Mesh_wall")
-surface_material_override/0 = SubResource("Mat_grabbable")
-
-[node name="Collision" type="CollisionShape3D" parent="Level/VaultWall"]
-shape = SubResource("Shape_wall")
-
-[node name="PlatformBlue" type="StaticBody3D" parent="Level"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 0.75, 0)
-collision_layer = 1
-
-[node name="Mesh" type="MeshInstance3D" parent="Level/PlatformBlue"]
-mesh = SubResource("Mesh_long")
-surface_material_override/0 = SubResource("Mat_accent")
-
-[node name="Collision" type="CollisionShape3D" parent="Level/PlatformBlue"]
-shape = SubResource("Shape_long")
-
-[node name="Stair1" type="StaticBody3D" parent="Level"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 0.45, 4)
-collision_layer = 1
-
-[node name="Mesh" type="MeshInstance3D" parent="Level/Stair1"]
-mesh = SubResource("Mesh_stair")
-surface_material_override/0 = SubResource("Mat_platform")
-
-[node name="Collision" type="CollisionShape3D" parent="Level/Stair1"]
-shape = SubResource("Shape_stair")
-
-[node name="Stair2" type="StaticBody3D" parent="Level"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 1.1, 6)
-collision_layer = 1
-
-[node name="Mesh" type="MeshInstance3D" parent="Level/Stair2"]
-mesh = SubResource("Mesh_stair")
-surface_material_override/0 = SubResource("Mat_platform")
-
-[node name="Collision" type="CollisionShape3D" parent="Level/Stair2"]
-shape = SubResource("Shape_stair")
-
-[node name="Stair3" type="StaticBody3D" parent="Level"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10, 1.75, 8)
-collision_layer = 1
-
-[node name="Mesh" type="MeshInstance3D" parent="Level/Stair3"]
-mesh = SubResource("Mesh_stair")
-surface_material_override/0 = SubResource("Mat_platform")
-
-[node name="Collision" type="CollisionShape3D" parent="Level/Stair3"]
-shape = SubResource("Shape_stair")
-
-[node name="GapPlatform" type="StaticBody3D" parent="Level"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -4, 2.4, -14)
-collision_layer = 1
-
-[node name="Mesh" type="MeshInstance3D" parent="Level/GapPlatform"]
-mesh = SubResource("Mesh_low")
-surface_material_override/0 = SubResource("Mat_accent")
-
-[node name="Collision" type="CollisionShape3D" parent="Level/GapPlatform"]
-shape = SubResource("Shape_low")
-
-[node name="HUD" type="CanvasLayer" parent="."]
-script = ExtResource("3_hud")
-
-[node name="Panel" type="PanelContainer" parent="HUD"]
-offset_left = 16.0
-offset_top = 16.0
-offset_right = 380.0
-offset_bottom = 230.0
-mouse_filter = 2
-
-[node name="Margin" type="MarginContainer" parent="HUD/Panel"]
-layout_mode = 2
-theme_override_constants/margin_left = 12
-theme_override_constants/margin_top = 10
-theme_override_constants/margin_right = 12
-theme_override_constants/margin_bottom = 10
-
-[node name="Label" type="Label" parent="HUD/Panel/Margin"]
-layout_mode = 2
-text = "John — 3D Platformer
-WASD  move
-Shift  sprint
-Space  jump
-Ctrl  crouch
-Mouse  look
-Esc  free / capture mouse
-
-Gold blocks = auto-vault while jumping up
-(vault does not trigger while falling)"
-autowrap_mode = 2
+[node name="InventoryUI" type="CanvasLayer" parent="."]
+script = ExtResource("3_invui")

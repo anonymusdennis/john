@@ -1,64 +1,52 @@
 # John
 
-3D platformer template for **Godot 4.7** — movement, jump, sprint, crouch, and automatic ledge vaulting.
-
-## Requirements
-
-- [Godot 4.7+](https://godotengine.org/) (Flatpak: `org.godotengine.Godot`)
+3D platformer playground for **Godot 4.7** — movement, vaulting, Minecraft-style hotbar/inventory, grenades, and physics toys.
 
 ## Run
 
 ```bash
-# Flatpak
+./run.sh
+# or
 flatpak run org.godotengine.Godot --path /path/to/john
-
-# Or open the project folder in the Godot editor and press F5
 ```
 
 ## Controls
 
-| Action | Keyboard | Gamepad |
-|--------|----------|---------|
-| Move | WASD | Left stick |
-| Look | Mouse | Right stick |
-| Jump | Space | A / Cross |
-| Sprint | Shift | RB / R1 |
-| Crouch | Ctrl | B / Circle |
-| Free mouse | Esc | — |
+| Action | Key |
+|--------|-----|
+| Move | WASD |
+| Look | Mouse |
+| Jump | Space |
+| Sprint | Shift |
+| Crouch | Ctrl |
+| Inventory | E / I |
+| Hotbar | 1–9 / scroll wheel |
+| Use item (grenade) | LMB / F |
+| Toggle camera | F5 (first / third person) |
+| Free mouse | Esc |
 
-## Features
+## Inventory
 
-- Third-person camera with spring arm collision
-- Walk / sprint / crouch speeds
-- Coyote time + jump buffering
-- Variable jump height (release jump early for a short hop)
-- **Auto-vault** while moving **up** into a grabbable ledge (never while falling)
-- Demo level with gold vault ledges, stairs, and gap platforms
+- Pickups go into the **bag** (open with E)
+- **Drag** bag items onto the bottom **hotbar**
+- Right-click a hotbar slot (with inventory open) to stash it back
+- Select a hotbar slot, then LMB to use (grenades throw + explode)
 
-## Vaulting
+Grenade pickups in the world **respawn after 4 seconds**.
 
-Vault triggers when all of these are true:
+## World
 
-1. Character is airborne
-2. Vertical velocity is upward (jumping / ascending)
-3. A wall/ledge is detected ahead within reach
-4. The ledge top is within min/max vault height
-5. There is clearance above the landing spot
+- Tall platform trail (~32m), spiral climb tower, sky bridge
+- Gold ledges support auto-vault while jumping up
+- Physics toys: Jenga tower, cube pile, ball pit, bowling/kegel set
 
-Mark ledges as grabbable by either:
-
-- Adding the body to the `grabbable` group, or
-- Attaching `scripts/grabbable_ledge.gd` (sets group + physics layer)
-
-Untagged world geometry can still vault if the face is vertical and a flat top is found.
-
-## Project layout
+## Layout
 
 ```
-scenes/main.tscn      Demo level + HUD
-scenes/player.tscn    Player pawn
-scripts/player.gd     Controller (move / jump / vault)
-scripts/grabbable_ledge.gd
+scripts/player.gd           Movement + vault + throw
+scripts/inventory.gd        Autoload bag + hotbar
+scripts/inventory_ui.gd     Hotbar / drag-drop UI
+scripts/world_pickup.gd     Collectibles
+scripts/grenade_projectile.gd
+scripts/world_builder.gd    Procedural level + toys
 ```
-
-Tune vault distances, speeds, and jump feel on the Player node export groups.

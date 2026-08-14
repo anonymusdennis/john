@@ -1,0 +1,43 @@
+[gd_scene load_steps=8 format=3]
+
+[ext_resource type="PackedScene" uid="uid://bx3sdnmokmwlk" path="res://assets/models/enemy.glb" id="1_enemy_glb"]
+[ext_resource type="Script" path="res://scripts/enemy.gd" id="2_enemy"]
+[ext_resource type="Script" path="res://scripts/enemy_procedural_anim.gd" id="3_proc"]
+[ext_resource type="Script" path="res://scripts/enemy_foot_ik.gd" id="4_foot"]
+[ext_resource type="Script" path="res://scripts/enemy_rig_debug.gd" id="5_debug"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape_enemy"]
+radius = 0.35
+height = 1.6
+
+[node name="Enemy" type="CharacterBody3D"]
+collision_layer = 1
+collision_mask = 3
+script = ExtResource("2_enemy")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.82, 0)
+shape = SubResource("CapsuleShape_enemy")
+
+[node name="Model" parent="." instance=ExtResource("1_enemy_glb")]
+
+[node name="FootTarget_L" type="Marker3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.18, 0.05, 0.2)
+
+[node name="FootTarget_R" type="Marker3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.18, 0.05, 0.2)
+
+[node name="KneePole_L" type="Marker3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.18, 0.5, 0.5)
+
+[node name="KneePole_R" type="Marker3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.18, 0.5, 0.5)
+
+[node name="ProceduralAnim" type="Node" parent="."]
+script = ExtResource("3_proc")
+
+[node name="FootIK" type="Node" parent="."]
+script = ExtResource("4_foot")
+
+[node name="RigDebug" type="Node" parent="."]
+script = ExtResource("5_debug")
