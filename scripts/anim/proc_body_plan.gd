@@ -204,13 +204,13 @@ static func make_centaur() -> ProcBodyPlan:
 		SegmentPlan.new(Vector3(0.0, 0.26, 0.0), 0.17),         # 4: humanoid chest
 	]
 	p.legs = [
-		LegPlan.new(0, Vector3(-0.17, -0.04, 0.02), 0.42, 0.42, Vector3(-0.2, 0.0, 0.04)),
-		LegPlan.new(0, Vector3(0.17, -0.04, 0.02), 0.42, 0.42, Vector3(0.2, 0.0, 0.04)),
-		LegPlan.new(2, Vector3(-0.17, -0.04, -0.02), 0.42, 0.42, Vector3(-0.2, 0.0, -0.04)),
-		LegPlan.new(2, Vector3(0.17, -0.04, -0.02), 0.42, 0.42, Vector3(0.2, 0.0, -0.04)),
+		LegPlan.new(0, Vector3(-0.17, -0.04, 0.02), 0.46, 0.46, Vector3(-0.2, 0.0, 0.04)),
+		LegPlan.new(0, Vector3(0.17, -0.04, 0.02), 0.46, 0.46, Vector3(0.2, 0.0, 0.04)),
+		LegPlan.new(2, Vector3(-0.17, -0.04, -0.02), 0.46, 0.46, Vector3(-0.2, 0.0, -0.04)),
+		LegPlan.new(2, Vector3(0.17, -0.04, -0.02), 0.46, 0.46, Vector3(0.2, 0.0, -0.04)),
 	]
 	for i in p.legs.size():
-		p.legs[i].step_trigger = 0.38
+		p.legs[i].step_trigger = 0.3
 		p.legs[i].step_lift = 0.2
 		p.legs[i].knee_forward = i >= 2     # Rear legs bend backward like hocks.
 	p.arms = [
