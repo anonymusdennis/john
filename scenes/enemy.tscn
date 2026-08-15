@@ -4,7 +4,7 @@
 [ext_resource type="Script" path="res://scripts/anim/proc_animator.gd" id="2_anim"]
 
 [node name="Enemy" type="CharacterBody3D"]
-collision_layer = 1
+collision_layer = 8
 collision_mask = 3
 floor_snap_length = 0.4
 script = ExtResource("1_enemy")

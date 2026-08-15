@@ -13,7 +13,7 @@ var _exploded: bool = false
 func _ready() -> void:
 	_fuse_left = fuse_time
 	collision_layer = 1
-	collision_mask = 1 | 2
+	collision_mask = 1 | 2 | 8
 	contact_monitor = true
 	max_contacts_reported = 4
 	_ensure_mesh()
@@ -51,7 +51,7 @@ func _explode() -> void:
 	var params := PhysicsShapeQueryParameters3D.new()
 	params.shape = sphere
 	params.transform = Transform3D(Basis.IDENTITY, origin)
-	params.collision_mask = 1 | 2
+	params.collision_mask = 1 | 2 | 8
 	var hits := space.intersect_shape(params, 64)
 	for hit in hits:
 		var collider: Variant = hit.get("collider")

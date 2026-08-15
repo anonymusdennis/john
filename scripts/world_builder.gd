@@ -14,13 +14,13 @@ const KegelKing = preload("res://scripts/kegel_king.gd")
 @export var enemy_count: int = 12
 
 ## Per-form navigation & physique presets: spiders wall-walk, imps and humans
-## parkour (jump + ledge climb), heavy centaurs stay ground-bound.
+## parkour (jump + ledge climb), heavy centaurs can still hop low obstacles.
 const ENEMY_DEFAULTS := {
-	"human": {"nav_mode": "parkour", "grip_strength": 4.5, "move_speed": 3.6},
-	"imp": {"nav_mode": "parkour", "grip_strength": 3.8, "move_speed": 4.4, "jump_apex": 2.0, "jump_range": 7.5},
-	"centaur": {"nav_mode": "basic", "grip_strength": 7.0, "move_speed": 4.6},
-	"spider": {"nav_mode": "basic", "can_wall_walk": true, "grip_strength": 6.5, "move_speed": 3.8},
-	"centipede": {"nav_mode": "basic", "grip_strength": 5.0, "move_speed": 3.2},
+	"human": {"nav_mode": "parkour", "grip_strength": 4.5, "move_speed": 4.2, "turn_speed": 8.5, "jump_apex": 1.9, "jump_range": 7.2, "max_step_height": 0.75},
+	"imp": {"nav_mode": "parkour", "grip_strength": 3.8, "move_speed": 4.8, "turn_speed": 9.0, "jump_apex": 2.2, "jump_range": 8.0, "max_step_height": 0.8},
+	"centaur": {"nav_mode": "parkour", "grip_strength": 7.0, "move_speed": 4.6, "jump_apex": 1.2, "jump_range": 4.5, "max_step_height": 0.9},
+	"spider": {"nav_mode": "basic", "can_wall_walk": true, "grip_strength": 6.5, "move_speed": 4.2, "turn_speed": 7.5},
+	"centipede": {"nav_mode": "basic", "can_wall_walk": true, "grip_strength": 5.5, "move_speed": 3.6},
 }
 
 
@@ -36,10 +36,10 @@ func _ready() -> void:
 	_build_ball_pit(Vector3(-18, 0, 6), rng)
 	_build_kegel_set(Vector3(-12, 0, -10))
 	_build_ramps_and_decor()
+	_start_nav_graph()
 	# Feature-showcase districts on the 400x400 map.
 	_build_zones(rng)
 	_spawn_enemies()
-	_start_nav_graph()
 
 
 ## Feature districts, each demonstrating one system from the smart-nav update.
@@ -64,7 +64,9 @@ func _start_nav_graph() -> void:
 	var graph := NavGraphScene.new()
 	graph.name = "NavGraph"
 	add_child(graph)
-	graph.configure(AABB(Vector3(-205, -6, -205), Vector3(410, 60, 410)))
+	# Spawn plaza + nearby playground only. The full 400×400 map was baking
+	# ~100k nav nodes and freezing the main thread ~5 s into play.
+	graph.configure(AABB(Vector3(-75, -6, -75), Vector3(150, 50, 150)))
 
 
 func _mat(color: Color, rough: float = 0.8, metal: float = 0.0) -> StandardMaterial3D:
@@ -435,6 +437,7 @@ func _spawn_enemy(root: Node3D, form: String, pos: Vector3, overrides: Dictionar
 	cfg.merge(overrides, true)
 	for key in cfg:
 		enemy.set(key, cfg[key])
+	enemy.home_position = pos
 	root.add_child(enemy)
 	enemy.global_position = pos
 	return enemy

@@ -152,6 +152,19 @@ func release_all_feet() -> void:
 		leg.stepping = false
 
 
+## Force all feet to replant on the ground (after knockdown / slide recovery).
+func replant_feet() -> void:
+	if _rig == null or _sk == null or _legs.is_empty():
+		return
+	var body_xf := _sk.global_transform
+	for i in _legs.size():
+		var home_world := body_xf * _leg_home_rest[i]
+		var hit := _ray_ground(home_world)
+		_legs[i].plant_instantly(hit["pos"], hit["normal"])
+	_grounded = true
+	_was_grounded = true
+
+
 ## Pins one hand to a world-space point (ledge grabbing); pass INF to release.
 func set_hand_override(index: int, world_pos: Vector3) -> void:
 	if _hand_override.size() != _rig.arms.size():
@@ -172,6 +185,11 @@ func arm_count() -> int:
 func _physics_process(delta: float) -> void:
 	if _rig == null or _sk == null:
 		return
+	var cam := get_viewport().get_camera_3d()
+	if cam != null:
+		var dist_sq := global_position.distance_squared_to(cam.global_position)
+		if dist_sq > 3600.0:  # 60 m — skip IK/gait for distant creatures.
+			return
 	_t += delta
 	if _attacking:
 		_attack_p += delta / maxf(plan.attack_time, 0.05)

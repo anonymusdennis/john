@@ -193,7 +193,7 @@ func _try_punch() -> void:
 	var params := PhysicsShapeQueryParameters3D.new()
 	params.shape = sphere
 	params.transform = Transform3D(Basis.IDENTITY, center)
-	params.collision_mask = 1 | 2
+	params.collision_mask = 1 | 2 | 8
 	params.exclude = [get_rid()]
 	var hits := space.intersect_shape(params, 12)
 
@@ -223,7 +223,7 @@ func _punch_hit_point(node: Node3D, eye: Vector3, aim: Vector3) -> Vector3:
 	var space := get_world_3d().direct_space_state
 	var query := PhysicsRayQueryParameters3D.create(eye, eye + aim * (punch_reach + 0.6))
 	query.exclude = [get_rid()]
-	query.collision_mask = 1 | 2
+	query.collision_mask = 1 | 2 | 8
 	var hit := space.intersect_ray(query)
 	if not hit.is_empty() and hit.get("collider") == node:
 		return hit["position"]

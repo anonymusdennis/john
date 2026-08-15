@@ -26,7 +26,7 @@ extends CharacterBody3D
 ## basis-relative rays, and corners are wrapped with probe rays. Strong hits
 ## override grip and throw the walker off the wall.
 
-enum State { CHASE, PATH, JUMPING, CLIMBING, LAUNCHED, RECOVER }
+enum State { CHASE, PATH, JUMPING, CLIMBING, LAUNCHED, RECOVER, RETURN_HOME, ROAM }
 
 const TARGET_GROUP := "nav_target"  ## Players AND companions register here.
 
@@ -48,6 +48,22 @@ const TARGET_GROUP := "nav_target"  ## Players AND companions register here.
 @export var jump_range: float = 6.5
 ## Beyond this distance from the player the enemy sleeps (animation + AI off).
 @export var activation_range: float = 80.0
+
+@export_group("Territory")
+@export var home_position: Vector3 = Vector3.ZERO
+@export var roam_radius: float = 10.0
+@export var return_distance: float = 30.0       ## ~10 nav cells; player farther => go home.
+@export var abandon_trail_height: float = 2.5   ## Player left stairs vertically.
+@export var abandon_trail_flat: float = 5.0     ## Player left trail horizontally (m).
+@export var max_home_return_attempts: int = 5
+@export var roam_goal_interval: float = 4.0
+@export var use_trail_following: bool = true
+
+@export_group("Air / Knockback")
+@export var air_control: float = 14.0
+@export var air_control_jump: float = 18.0
+@export var launched_friction: float = 11.0
+@export var launched_max_time: float = 2.5
 
 @export_group("Physique")
 ## Kg-ish inertia; -1 = derive from the body plan's collider volume.
@@ -82,6 +98,7 @@ var _path_gen: int = 0                      ## Request serial; stale results are
 var _pending_timeout: float = 0.0
 
 const PATH_REQUEST_TIMEOUT := 3.0           ## Give up waiting on a query after this.
+const MAX_PATHFINDERS := 8                  ## Only this many enemies may query the graph at once.
 var _repath_timer: float = 0.0
 var _path_goal: Vector3 = Vector3.INF
 var _stuck_timer: float = 0.0
@@ -98,12 +115,27 @@ var _climb_p: float = 0.0
 var _climb_dur: float = 0.6
 
 var _sleeping: bool = false
+var _graph_hooked: bool = false
+var _last_pos: Vector3 = Vector3.ZERO
+var _progress_timer: float = 0.0
+var _route_check_cd: float = 0.0
+var _reactive_cd: float = 0.0
+var _cached_needs_path: bool = false
+var _cached_blocked: bool = false
+var _crowded: bool = false
+var _crowded_cd: float = 0.0
+var _home_return_attempts: int = 0
+var _roam_goal: Vector3 = Vector3.ZERO
+var _roam_timer: float = 0.0
+var _launched_time: float = 0.0
+var _jump_fail_streak: int = 0
+var _path_goal_override: Vector3 = Vector3.INF
 
 
 func _ready() -> void:
 	add_to_group("enemy")
-	collision_layer = 1
-	collision_mask = 1 | 2
+	collision_layer = 8          ## Layer "enemy" — does NOT collide with other enemies.
+	collision_mask = 1 | 2       ## World + player only.
 	if animator.plan == null or animator.body_form != body_form:
 		animator.build(StringName(body_form))
 	_fit_collider()
@@ -120,6 +152,11 @@ func _ready() -> void:
 		_profile.can_jump = true
 		_profile.can_parkour = animator.arm_count() >= 2   # Climbing needs hands.
 	_profile.can_wall_walk = can_wall_walk
+	_last_pos = global_position
+	if home_position == Vector3.ZERO:
+		home_position = global_position
+	_roam_goal = home_position
+	call_deferred("_hook_nav_graph")
 
 
 func _exit_tree() -> void:
@@ -146,6 +183,9 @@ func _physics_process(delta: float) -> void:
 	_attack_cd = maxf(_attack_cd - delta, 0.0)
 	_hop_cd = maxf(_hop_cd - delta, 0.0)
 	_repath_timer = maxf(_repath_timer - delta, 0.0)
+	_route_check_cd = maxf(_route_check_cd - delta, 0.0)
+	_reactive_cd = maxf(_reactive_cd - delta, 0.0)
+	_crowded_cd = maxf(_crowded_cd - delta, 0.0)
 	_grip_damage = maxf(_grip_damage - 1.2 * delta, 0.0)
 	if _path_pending:
 		_pending_timeout -= delta
@@ -155,9 +195,18 @@ func _physics_process(delta: float) -> void:
 	_acquire_target(delta)
 	if _graph == null:
 		_graph = get_tree().get_first_node_in_group("nav_graph") as NavGraph
+		_hook_nav_graph()
 
 	if _update_lod():
 		return
+
+	if _update_crowded():
+		_idle_move(delta)
+		_finish_move(delta)
+		return
+
+	_update_territory_brain(delta)
+	_roam_timer = maxf(_roam_timer - delta, 0.0)
 
 	match _state:
 		State.LAUNCHED:
@@ -172,6 +221,10 @@ func _physics_process(delta: float) -> void:
 			_process_chase(delta)
 		State.PATH:
 			_process_path(delta)
+		State.RETURN_HOME:
+			_process_return_home(delta)
+		State.ROAM:
+			_process_roam(delta)
 
 
 ## Multiplayer-aware target selection: hunt the nearest "nav_target" (any
@@ -220,6 +273,158 @@ func _update_lod() -> bool:
 		_sleeping = false
 		animator.set_physics_process(true)
 	return false
+
+
+## Something (player or another body) is standing on this enemy — skip heavy
+## AI/pathing so a dogpile does not hitch the main thread.
+func _update_crowded() -> bool:
+	if _crowded_cd > 0.0:
+		return _crowded
+	_crowded_cd = 0.08
+	var space := get_world_3d().direct_space_state
+	var from := global_position + Vector3.UP * (animator.plan.collider_height * 0.85)
+	var q := PhysicsRayQueryParameters3D.create(from, from + Vector3.UP * 1.6)
+	q.collision_mask = 2 | 8   ## Player + other enemies.
+	q.exclude = [get_rid()]
+	_crowded = not space.intersect_ray(q).is_empty()
+	return _crowded
+
+
+func _may_pathfind() -> bool:
+	if _graph == null or _target == null:
+		return false
+	# Rotate which enemies may query — no O(n) group scan every repath.
+	var wave := int(Time.get_ticks_msec() / 600) % MAX_PATHFINDERS
+	return (get_instance_id() % MAX_PATHFINDERS) == wave
+
+
+# --- Territory / home --------------------------------------------------------
+
+func _update_territory_brain(_delta: float) -> void:
+	if _state in [State.LAUNCHED, State.JUMPING, State.CLIMBING, State.RECOVER]:
+		return
+	if _target == null:
+		if _state != State.ROAM:
+			_enter_roam()
+		return
+
+	var dist := global_position.distance_to(_target.global_position)
+	if _state == State.RETURN_HOME or _state == State.ROAM:
+		if dist < chase_range * 0.9:
+			_state = State.CHASE
+			_home_return_attempts = 0
+			_path_goal_override = Vector3.INF
+			_clear_path()
+		return
+
+	if dist > return_distance:
+		_enter_return_home()
+		return
+
+	if _path_from_trail and _should_abandon_trail():
+		_on_route_failed()
+
+
+func _on_route_failed() -> void:
+	_clear_path()
+	_home_return_attempts += 1
+	if _home_return_attempts >= max_home_return_attempts:
+		home_position = global_position
+		_roam_goal = home_position
+		_home_return_attempts = 0
+		_enter_roam()
+	else:
+		_enter_return_home()
+
+
+func _enter_return_home() -> void:
+	_clear_path()
+	_path_goal_override = home_position
+	_state = State.RETURN_HOME
+
+
+func _enter_roam() -> void:
+	_clear_path()
+	_path_goal_override = Vector3.INF
+	_state = State.ROAM
+	_pick_roam_goal()
+	_roam_timer = roam_goal_interval * randf_range(0.4, 1.0)
+
+
+func _pick_roam_goal() -> void:
+	var ang := randf() * TAU
+	var r := randf_range(1.5, roam_radius)
+	_roam_goal = home_position + Vector3(cos(ang) * r, 0.0, sin(ang) * r)
+
+
+func _should_abandon_trail() -> bool:
+	if not use_trail_following or _target == null:
+		return true
+	var rec := NavPathRecorder.find_for(_target)
+	if rec == null or rec.size() < 2:
+		return true
+	if rec.latest().distance_to(_target.global_position) > 6.0:
+		return true
+	var trail_flat := Vector2(rec.latest().x, rec.latest().z)
+	var player_flat := Vector2(_target.global_position.x, _target.global_position.z)
+	if player_flat.distance_to(trail_flat) > abandon_trail_flat:
+		return true
+	if absf(_target.global_position.y - rec.latest().y) > abandon_trail_height:
+		return true
+	return false
+
+
+func _player_ground_hint() -> Vector3:
+	if _target == null:
+		return global_position
+	var p := _target.global_position
+	var space := get_world_3d().direct_space_state
+	var from := p + Vector3.UP * 0.6
+	var q := PhysicsRayQueryParameters3D.create(from, from + Vector3.DOWN * 40.0)
+	q.collision_mask = SURFACE_MASK | 1
+	var hit := space.intersect_ray(q)
+	if not hit.is_empty():
+		return hit["position"]
+	return Vector3(p.x, global_position.y, p.z)
+
+
+func _get_chase_point() -> Vector3:
+	if _target == null:
+		return home_position
+	if _target is CharacterBody3D and not (_target as CharacterBody3D).is_on_floor():
+		var hint := _player_ground_hint()
+		return Vector3(_target.global_position.x, hint.y, _target.global_position.z)
+	return _target.global_position
+
+
+func _get_face_dir() -> Vector3:
+	if _target == null:
+		return _desired_fwd
+	return Vector3(
+		_target.global_position.x - global_position.x,
+		0.0,
+		_target.global_position.z - global_position.z,
+	)
+
+
+func _air_steer_toward(target: Vector3, delta: float, strength: float) -> void:
+	var flat := Vector3(target.x - global_position.x, 0.0, target.z - global_position.z)
+	if flat.length_squared() < 0.01:
+		return
+	_face_toward(flat)
+	var wish := flat.normalized() * move_speed
+	var accel := strength * delta
+	velocity.x = move_toward(velocity.x, wish.x, accel)
+	velocity.z = move_toward(velocity.z, wish.z, accel)
+
+
+func _slide_along_walls() -> void:
+	for i in get_slide_collision_count():
+		var col := get_slide_collision(i)
+		var n: Vector3 = col.get_normal()
+		if n.y > 0.6:
+			continue
+		velocity = velocity.slide(n)
 
 
 # --- Shared movement helpers ---------------------------------------------------
@@ -302,11 +507,21 @@ func _finish_move(delta: float) -> void:
 
 ## Watches for lack of progress while trying to move -> triggers repaths.
 func _track_stuck(delta: float, remaining: float) -> void:
+	var moved := global_position.distance_to(_last_pos)
+	if moved > 0.12:
+		_progress_timer = 0.0
+		_last_pos = global_position
+	else:
+		_progress_timer += delta
+	_last_pos = global_position
+
 	var flat_vel := velocity - _surface_normal * velocity.dot(_surface_normal)
-	if remaining > 1.0 and flat_vel.length() < move_speed * 0.25:
+	if remaining > 0.8 and flat_vel.length() < move_speed * 0.3:
 		_stuck_timer += delta
 	else:
-		_stuck_timer = maxf(_stuck_timer - delta * 2.0, 0.0)
+		_stuck_timer = maxf(_stuck_timer - delta * 2.5, 0.0)
+	if _progress_timer > 0.35:
+		_stuck_timer = maxf(_stuck_timer, _progress_timer)
 
 
 ## Reactive tiny-ledge fix: shin probe + lip probe + headroom probe, then a
@@ -344,7 +559,191 @@ func _try_step_up(dir: Vector3) -> void:
 		return
 
 	velocity.y = sqrt(2.0 * _gravity * (rise + 0.3))
-	_hop_cd = 0.4
+	_hop_cd = 0.35
+
+
+func _hook_nav_graph() -> void:
+	if _graph_hooked or _graph == null:
+		return
+	_graph_hooked = true
+	if not _graph.is_ready():
+		_graph.build_finished.connect(_on_nav_graph_ready, CONNECT_ONE_SHOT)
+	else:
+		call_deferred("_on_nav_graph_ready")
+
+
+func _on_nav_graph_ready() -> void:
+	# Stagger repaths so graph-ready does not flood the worker + main thread.
+	_repath_timer = randf_range(0.5, 2.5)
+	_stuck_timer = 0.0
+
+
+func _has_direct_los(target_pos: Vector3) -> bool:
+	var space := get_world_3d().direct_space_state
+	var eye := global_position + Vector3.UP * animator.plan.collider_height * 0.82
+	var aim := target_pos + Vector3.UP * 1.0
+	var q := PhysicsRayQueryParameters3D.create(eye, aim)
+	q.collision_mask = SURFACE_MASK
+	q.exclude = [get_rid()]
+	var hit := space.intersect_ray(q)
+	if hit.is_empty():
+		return true
+	return (hit["position"] as Vector3).distance_to(aim) < 1.4
+
+
+func _is_blocked_ahead(dir: Vector3) -> bool:
+	if dir.length_squared() < 0.001:
+		return false
+	var space := get_world_3d().direct_space_state
+	var r := animator.plan.collider_radius
+	var shin_from := global_position + Vector3.UP * 0.18
+	var q := PhysicsRayQueryParameters3D.create(shin_from, shin_from + dir.normalized() * (r + 0.7))
+	q.collision_mask = SURFACE_MASK
+	var hit := space.intersect_ray(q)
+	if hit.is_empty():
+		return false
+	var n: Vector3 = hit["normal"]
+	return n.y < 0.55
+
+
+func _direct_route_viable(to_target: Vector3) -> bool:
+	if absf(to_target.y) > max_step_height + 0.35:
+		return false
+	var flat_dir := Vector3(to_target.x, 0.0, to_target.z) - Vector3(global_position.x, 0.0, global_position.z)
+	if flat_dir.length_squared() < 0.04:
+		return absf(to_target.y) <= max_step_height + 0.35
+	flat_dir = flat_dir.normalized()
+	if _void_ahead(flat_dir, max_step_height + 0.5):
+		return false
+	if _is_blocked_ahead(flat_dir):
+		return false
+	if _target != null and not _has_direct_los(_target.global_position):
+		return false
+	return true
+
+
+func _refresh_route_cache(to_target: Vector3, flat_dir: Vector3) -> void:
+	if _route_check_cd > 0.0:
+		return
+	_route_check_cd = 0.12
+	_cached_needs_path = not _direct_route_viable(to_target)
+	_cached_blocked = flat_dir.length_squared() > 0.001 and _is_blocked_ahead(flat_dir)
+
+
+func _needs_smart_route(to_target: Vector3) -> bool:
+	if to_target.y > max_step_height + 0.25:
+		return true
+	if _stuck_timer > 0.45 or _progress_timer > 0.45:
+		return true
+	if _target != null and absf(to_target.y) > 0.75:
+		return true
+	return _cached_needs_path
+
+
+func _is_blocked_cached(dir: Vector3) -> bool:
+	if dir.length_squared() < 0.001:
+		return false
+	return _cached_blocked
+
+
+func _find_jump_lip(dir: Vector3) -> Vector3:
+	if not _profile.can_jump:
+		return Vector3.INF
+	var space := get_world_3d().direct_space_state
+	var r := animator.plan.collider_radius
+	var best := Vector3.INF
+	var best_score := INF
+	for deg in [-30.0, 0.0, 30.0]:
+		var probe := dir.rotated(Vector3.UP, deg_to_rad(deg)).normalized()
+		var over := global_position + probe * (r + 0.85) + Vector3.UP * (jump_apex + 0.45)
+		var down_q := PhysicsRayQueryParameters3D.create(over, over + Vector3.DOWN * (jump_apex + 1.2))
+		down_q.collision_mask = SURFACE_MASK
+		var top := space.intersect_ray(down_q)
+		if top.is_empty():
+			continue
+		var lip: Vector3 = top["position"]
+		var rise := lip.y - global_position.y
+		var flat := Vector2(lip.x - global_position.x, lip.z - global_position.z).length()
+		if rise < 0.15 or rise > jump_apex + 0.35 or flat > jump_range + 0.5:
+			continue
+		var head_from := lip + Vector3.UP * 0.05
+		var head_q := PhysicsRayQueryParameters3D.create(head_from, head_from + Vector3.UP * animator.plan.collider_height * 0.95)
+		head_q.collision_mask = SURFACE_MASK
+		if not space.intersect_ray(head_q).is_empty():
+			continue
+		var score := flat + absf(rise - clampf(_target.global_position.y - global_position.y, 0.0, jump_apex)) * 2.0 if _target else flat
+		if score < best_score:
+			best_score = score
+			best = lip + Vector3.UP * 0.04
+	return best
+
+
+func _find_climb_lip(dir: Vector3) -> Vector3:
+	if not _profile.can_parkour:
+		return Vector3.INF
+	var space := get_world_3d().direct_space_state
+	var r := animator.plan.collider_radius
+	var shin_from := global_position + Vector3.UP * 0.35
+	var q := PhysicsRayQueryParameters3D.create(shin_from, shin_from + dir.normalized() * (r + 0.95))
+	q.collision_mask = SURFACE_MASK
+	var hit := space.intersect_ray(q)
+	if hit.is_empty():
+		return Vector3.INF
+	var n: Vector3 = hit["normal"]
+	if n.y > 0.45:
+		return Vector3.INF
+	var over := (hit["position"] as Vector3) + dir.normalized() * 0.35 + Vector3.UP * (_profile.climb_height + 0.4)
+	var down_q := PhysicsRayQueryParameters3D.create(over, over + Vector3.DOWN * (_profile.climb_height + 0.6))
+	down_q.collision_mask = SURFACE_MASK
+	var top := space.intersect_ray(down_q)
+	if top.is_empty():
+		return Vector3.INF
+	var lip: Vector3 = top["position"]
+	var rise := lip.y - global_position.y
+	if rise < max_step_height + 0.1 or rise > _profile.climb_height + 0.35:
+		return Vector3.INF
+	return lip
+
+
+func _try_reactive_ascent(dir: Vector3) -> bool:
+	if not is_on_floor() or _hop_cd > 0.0 or _reactive_cd > 0.0:
+		return false
+	if _stuck_timer < 0.25 and _progress_timer < 0.25:
+		return false
+	if dir.length_squared() < 0.001 and _target != null:
+		dir = Vector3(_target.global_position.x - global_position.x, 0.0, _target.global_position.z - global_position.z)
+	if dir.length_squared() < 0.001:
+		return false
+	dir = dir.normalized()
+
+	var climb_lip := _find_climb_lip(dir)
+	if climb_lip != Vector3.INF and _begin_climb(climb_lip):
+		_reactive_cd = 0.35
+		return true
+
+	for side in [-1.0, 1.0]:
+		var climb_side := _find_climb_lip(dir.rotated(Vector3.UP, deg_to_rad(35.0 * side)))
+		if climb_side != Vector3.INF and _begin_climb(climb_side):
+			_reactive_cd = 0.35
+			return true
+
+	var jump_lip := _find_jump_lip(dir)
+	if jump_lip != Vector3.INF and _begin_jump(jump_lip):
+		_reactive_cd = 0.35
+		return true
+
+	for side in [-1.0, 1.0]:
+		var jump_side := _find_jump_lip(dir.rotated(Vector3.UP, deg_to_rad(40.0 * side)))
+		if jump_side != Vector3.INF and _begin_jump(jump_side):
+			_reactive_cd = 0.35
+			return true
+
+	if can_wall_walk and _target != null and _target.global_position.y > global_position.y + 1.2:
+		if _try_attach_wall():
+			_reactive_cd = 0.35
+			return true
+
+	return false
 
 
 ## True when the ground ahead ends in a drop deeper than `allowed_drop` —
@@ -365,19 +764,20 @@ func _process_chase(delta: float) -> void:
 		_finish_move(delta)
 		return
 
-	var to_target := _target.global_position - global_position
-	var dist := to_target.length()
+	var chase_pt := _get_chase_point()
+	var to_target := chase_pt - global_position
+	var dist := global_position.distance_to(_target.global_position)
 	if dist > chase_range:
 		_apply_neck_relief(delta)
 		_idle_move(delta)
 		_finish_move(delta)
 		return
 
-	var flat_dist := Vector2(to_target.x, to_target.z).length()
-	if flat_dist <= attack_range and absf(to_target.y) < 2.0 and not _on_wall_surface():
+	var flat_dist := Vector2(_target.global_position.x - global_position.x, _target.global_position.z - global_position.z).length()
+	if flat_dist <= attack_range and absf(_target.global_position.y - global_position.y) < 2.0 and not _on_wall_surface():
 		if _attack_cd <= 0.0 and animator.trigger_attack():
 			_attack_cd = attack_cooldown
-		_face_toward(to_target)
+		_face_toward(_get_face_dir())
 		_idle_move(delta)
 		_finish_move(delta)
 		return
@@ -386,32 +786,85 @@ func _process_chase(delta: float) -> void:
 		_process_wall_chase(delta)
 		return
 
-	# Does direct steering suffice, or do we need the smart path? The query
-	# is async (worker thread) — keep steering while it is being solved.
-	var needs_path := absf(to_target.y) > 1.6 or _stuck_timer > 0.8
-	if needs_path:
-		_try_request_path()
+	var flat_dir := _get_face_dir()
+	if flat_dir.length_squared() > 0.01:
+		flat_dir = flat_dir.normalized()
 
-	# Wall walkers: player above and a face in front -> just climb it.
-	if can_wall_walk and to_target.y > 1.6 and _try_attach_wall():
+	_refresh_route_cache(to_target, flat_dir)
+
+	if _graph != null and not _graph.is_ready():
+		_face_toward(flat_dir)
+		_steer_move(chase_pt, delta, 0.85)
 		_finish_move(delta)
 		return
 
-	# Void-ahead guard: never blindly run off a lip when falling would strand
-	# us — brake at the edge and plan a smart route instead of dropping into
-	# the gap and (formerly) mega-jumping back up from the very ground.
-	# Deep drops are only taken when the target is actually below us.
-	var flat_dir := Vector3(to_target.x, 0.0, to_target.z)
-	if is_on_floor() and flat_dir.length_squared() > 0.01:
-		var allowed_drop := max_drop if to_target.y < -1.5 else maxf(max_step_height + 0.6, 1.2)
-		if _void_ahead(flat_dir.normalized(), allowed_drop):
-			_try_request_path()
-			_face_toward(to_target)
+	if _needs_smart_route(to_target):
+		_try_request_path()
+		if _path.is_empty() and not _path_pending and use_trail_following and not _should_abandon_trail():
+			_try_follow_trail()
+		if _state == State.PATH:
+			_finish_move(delta)
+			return
+		if _try_reactive_ascent(flat_dir):
+			_finish_move(delta)
+			return
+		if not _path_pending:
+			_face_toward(flat_dir)
+			if _is_blocked_cached(flat_dir):
+				for side in [-1.0, 1.0]:
+					var flank := flat_dir.rotated(Vector3.UP, deg_to_rad(55.0 * side))
+					if not _is_blocked_cached(flank):
+						_steer_move(global_position + flank * 2.0, delta, 0.85)
+						_finish_move(delta)
+						return
 			_idle_move(delta)
 			_finish_move(delta)
 			return
 
-	_steer_move(_target.global_position, delta)
+	if can_wall_walk and _target.global_position.y > global_position.y + 1.2 and _try_attach_wall():
+		_finish_move(delta)
+		return
+
+	if is_on_floor() and flat_dir.length_squared() > 0.01:
+		var allowed_drop := max_drop if _target.global_position.y < global_position.y - 1.5 else maxf(max_step_height + 0.6, 1.2)
+		if _void_ahead(flat_dir, allowed_drop):
+			_try_request_path()
+			if _try_reactive_ascent(flat_dir):
+				_finish_move(delta)
+				return
+			_face_toward(flat_dir)
+			_idle_move(delta)
+			_finish_move(delta)
+			return
+
+	_steer_move(chase_pt, delta)
+	_finish_move(delta)
+
+
+func _process_return_home(delta: float) -> void:
+	_path_goal_override = home_position
+	var to_home := home_position - global_position
+	if Vector2(to_home.x, to_home.z).length() < 1.2 and absf(to_home.y) < 2.0:
+		_enter_roam()
+		_finish_move(delta)
+		return
+	_face_toward(to_home)
+	if _graph != null and _graph.is_ready() and _repath_timer <= 0.0:
+		_try_request_path()
+	_steer_move(home_position, delta, 0.9)
+	_finish_move(delta)
+
+
+func _process_roam(delta: float) -> void:
+	if _roam_timer <= 0.0:
+		_pick_roam_goal()
+		_roam_timer = roam_goal_interval * randf_range(0.7, 1.3)
+	var to_goal := _roam_goal - global_position
+	if Vector2(to_goal.x, to_goal.z).length() < 1.0:
+		_idle_move(delta)
+	else:
+		_face_toward(to_goal)
+		_steer_move(_roam_goal, delta, 0.55)
 	_finish_move(delta)
 
 
@@ -428,14 +881,21 @@ func _process_wall_chase(delta: float) -> void:
 func _process_path(delta: float) -> void:
 	if _target == null or _path.is_empty() or _path_i >= _path.size():
 		_clear_path()
-		_process_chase(delta)
+		_finish_move(delta)
 		return
 
-	# Close enough for direct pursuit again?
+	# Close enough for direct pursuit — but not if we still need a vertical route.
 	var to_target := _target.global_position - global_position
 	if Vector2(to_target.x, to_target.z).length() < 5.0 and absf(to_target.y) < 1.4:
-		_clear_path()
-		_process_chase(delta)
+		if not _needs_smart_route(to_target):
+			_clear_path()
+			_finish_move(delta)
+			return
+
+	# Abandon stale trail paths when the player left the route.
+	if _path_from_trail and _should_abandon_trail():
+		_on_route_failed()
+		_finish_move(delta)
 		return
 
 	# Target drifted away from this path's goal -> repath on cadence (async;
@@ -443,8 +903,16 @@ func _process_path(delta: float) -> void:
 	if _repath_timer <= 0.0 and _path_goal.distance_to(_target.global_position) > 4.0:
 		_try_request_path()
 
-	if _stuck_timer > 1.1:
+	if _stuck_timer > 0.75:
 		_stuck_timer = 0.0
+		_jump_fail_streak += 1
+		if _jump_fail_streak >= 3:
+			_on_route_failed()
+			_finish_move(delta)
+			return
+		if _try_reactive_ascent(Vector3(_target.global_position.x - global_position.x, 0.0, _target.global_position.z - global_position.z)):
+			_finish_move(delta)
+			return
 		_clear_path()
 		_finish_move(delta)
 		return
@@ -481,9 +949,10 @@ func _process_path(delta: float) -> void:
 			# into an impossible ground-to-rooftop mega jump from below.
 			if velocity.y < -3.0 or global_position.y < wp_pos.y - max_drop - 1.0:
 				_clear_path()
+				_on_route_failed()
 				_finish_move(delta)
 				return
-			_steer_move(wp_pos, delta)
+			_air_steer_toward(wp_pos, delta, air_control)
 		NavGraph.Edge.CLIMB:
 			var flat := Vector2(to_wp.x, to_wp.z).length()
 			# Stuck against the face still counts as "arrived" — grab anyway.
@@ -525,16 +994,28 @@ func _waypoint_reached(wp_pos: Vector3, move: int) -> bool:
 
 func _process_jumping(delta: float) -> void:
 	_jump_time -= delta
+	var steer_to := _jump_target
+	if _target != null:
+		steer_to = Vector3(_jump_target.x, _jump_target.y, _jump_target.z)
+	_air_steer_toward(steer_to, delta, air_control_jump)
 	velocity.y -= _gravity * delta
 	move_and_slide()
+	_slide_along_walls()
+	_align_body(delta)
 	animator.set_locomotion(velocity, false)
 	animator.set_look_target(_target)
 	if (is_on_floor() and _jump_time < 0.35) or _jump_time <= -2.0:
-		# Landed far from the intended lip -> the rest of the path is stale.
-		if global_position.distance_to(_jump_target) > 3.0:
+		var land_err := Vector2(global_position.x - _jump_target.x, global_position.z - _jump_target.z).length()
+		if land_err > 2.5:
+			_jump_fail_streak += 1
 			_clear_path()
+			if _jump_fail_streak >= 3:
+				_on_route_failed()
 			_state = State.CHASE
+			animator.replant_feet()
 			return
+		_jump_fail_streak = 0
+		animator.replant_feet()
 		_state = State.PATH if not _path.is_empty() else State.CHASE
 		if not _path.is_empty() and _path_i < _path.size():
 			var wp: Dictionary = _path[_path_i]
@@ -565,6 +1046,7 @@ func _begin_jump(target: Vector3) -> bool:
 	_jump_target = target
 	_jump_time = t_total + 0.4
 	_state = State.JUMPING
+	_jump_fail_streak = 0
 	animator.release_all_feet()
 	return true
 
@@ -616,23 +1098,35 @@ func _begin_climb(target: Vector3) -> bool:
 
 ## Ballistic tumble after a grip-breaking hit: no steering until landing.
 func _process_launched(delta: float) -> void:
+	_launched_time += delta
 	_surface_normal = Vector3.UP
 	up_direction = Vector3.UP
 	velocity.y -= _gravity * delta
+	if is_on_floor():
+		var hv := Vector3(velocity.x, 0.0, velocity.z)
+		var damp := clampf(launched_friction * delta, 0.0, 1.0)
+		hv = hv * (1.0 - damp)
+		velocity.x = hv.x
+		velocity.z = hv.z
 	move_and_slide()
 	_align_body(delta)
-	animator.set_locomotion(velocity, false)
+	var grounded := is_on_floor()
+	animator.set_locomotion(velocity, grounded)
 	animator.set_look_target(_target)
-	if is_on_floor() and Vector3(velocity.x, 0.0, velocity.z).length() < 6.0:
-		velocity.x *= 0.4
-		velocity.z *= 0.4
+	if grounded and (Vector3(velocity.x, 0.0, velocity.z).length() < 1.8 or _launched_time > launched_max_time):
+		animator.replant_feet()
+		velocity.x *= 0.35
+		velocity.z *= 0.35
 		_state = State.RECOVER
-		_recover_timer = 0.55
+		_recover_timer = 0.45
 		_ext_vel = Vector3.ZERO
+		_launched_time = 0.0
 
 
 func _process_recover(delta: float) -> void:
 	_recover_timer -= delta
+	if is_on_floor():
+		animator.replant_feet()
 	if _recover_timer <= 0.0:
 		_state = State.CHASE
 	_idle_move(delta)
@@ -645,13 +1139,21 @@ func _process_recover(delta: float) -> void:
 ## thread solves it off-frame; _on_path_result adopts it when it lands.
 ## Returns true when a request was actually queued.
 func _try_request_path() -> bool:
-	if _graph == null or _target == null or _path_pending:
+	if _graph == null or _path_pending or _crowded:
+		return false
+	if _state != State.RETURN_HOME and _target == null:
+		return false
+	if not _may_pathfind():
 		return false
 	if _repath_timer > 0.0 or not _graph.can_query():
 		return false
-	_repath_timer = 0.9 + randf() * 0.5
+	_repath_timer = 0.75 + randf() * 0.45
 	_path_gen += 1
-	if _graph.request_path(global_position, _target.global_position, _profile,
+	var goal := _path_goal_override if _path_goal_override != Vector3.INF else (_target.global_position if _target else global_position)
+	if _path_goal_override == Vector3.INF and _target is CharacterBody3D:
+		var tv := (_target as CharacterBody3D).velocity
+		goal += Vector3(tv.x, 0.0, tv.z) * 0.4
+	if _graph.request_path(global_position, goal, _profile,
 			_on_path_result.bind(_path_gen)):
 		_path_pending = true
 		_pending_timeout = PATH_REQUEST_TIMEOUT
@@ -695,15 +1197,13 @@ func _adopt_path(path: Array, from_trail: bool) -> void:
 ## jumps for parkour bodies, ledge climbs for bodies with hands, wall links
 ## for wall walkers — so every AI type gets its own valid interpretation.
 func _try_follow_trail() -> bool:
-	if _target == null:
+	if not use_trail_following or _target == null or _should_abandon_trail():
 		return false
 	var rec := NavPathRecorder.find_for(_target)
 	if rec == null or rec.size() < 2:
 		return false
-	# The trail is only a template while it still leads to the target.
-	if rec.latest().distance_to(_target.global_position) > 6.0:
-		return false
-	var join := rec.nearest_index(global_position, 6.0, 3.5)
+	var join_dy := clampf(absf(_target.global_position.y - global_position.y) + 2.5, 4.0, 18.0)
+	var join := rec.nearest_index(global_position, 12.0, join_dy)
 	if join < 0:
 		return false
 	# The entry segment (enemy -> join crumb) must be traversable too; back
@@ -871,6 +1371,7 @@ func apply_knockback(impulse: Vector3, hit_pos: Vector3 = Vector3.INF) -> void:
 		up_direction = Vector3.UP
 		_clear_path()
 		_state = State.LAUNCHED
+		_launched_time = 0.0
 		velocity += dv
 		if velocity.y < dv.length() * 0.25:
 			velocity.y = dv.length() * 0.35
@@ -885,6 +1386,8 @@ func apply_knockback(impulse: Vector3, hit_pos: Vector3 = Vector3.INF) -> void:
 ## The head asked for help: rotate the torso (legs step around) so the
 ## enemy can keep watching the player without breaking its neck.
 func _apply_neck_relief(delta: float) -> void:
+	if _target != null and _target.global_position.y - global_position.y > 1.4:
+		return
 	var request := animator.torso_turn_request
 	if absf(request) > 0.02:
 		_desired_fwd = _desired_fwd.rotated(_surface_normal, clampf(request, -1.0, 1.0) * turn_speed * 0.6 * delta)

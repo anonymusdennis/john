@@ -29,7 +29,7 @@ signal build_finished
 enum Edge { WALK, STEP, DROP, JUMP, CLIMB, WALL }
 enum BuildPhase { IDLE, SAMPLE, LINK, JUMPS, DONE }
 
-const CELL := 1.5                   ## Horizontal sampling resolution (m).
+const CELL := 3.0                   ## Horizontal sampling resolution (m).
 const SURFACE_MASK := 32            ## Physics layer 6: static nav surfaces only.
 const MIN_HEADROOM := 0.72          ## Smallest crawl space worth a node.
 const MAX_HEADROOM := 6.0
@@ -39,15 +39,15 @@ const STEP_MAX := 0.9               ## Rise crossable by stepping up.
 const CLIMB_MAX := 3.0              ## Tallest hand-climbable ledge.
 const WALL_MAX := 18.0              ## Tallest wall-walk link.
 const DROP_MAX := 6.0               ## Longest recorded drop edge.
-const JUMP_DY_UP := 1.4
-const JUMP_DY_DOWN := 3.5
+const JUMP_DY_UP := 2.2
+const JUMP_DY_DOWN := 4.0
 const MAX_MARCH_HITS := 8           ## Surface levels per column (tunnels etc).
 
-const SAMPLE_PER_FRAME := 900
-const LINK_PER_FRAME := 1200
-const JUMPS_PER_FRAME := 400
-const ASTAR_MAX_EXPANSIONS := 9000
-const MAX_PENDING := 24             ## Max queued async path requests.
+const BUILD_BUDGET_US := 3500         ## Max microseconds of nav baking per frame (~3.5 ms).
+const ASTAR_MAX_EXPANSIONS := 3500
+const MAX_PENDING := 8              ## Max queued async path requests.
+const MAX_DELIVER_PER_FRAME := 2      ## Main-thread callbacks per frame (never hitch).
+const MAX_PENDING_DELIVERIES := 16    ## Drop stale results beyond this (prevents memory growth).
 const HEURISTIC_WEIGHT := 1.12      ## Slightly greedy A* = far fewer expansions.
 
 const DIRS4: Array[Vector2i] = [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]
@@ -78,6 +78,7 @@ var _results_mutex := Mutex.new()
 var _astar_mutex := Mutex.new()     ## Guards the shared A* scratch arrays.
 var _requests: Array = []           ## {from, to, prof, callback}
 var _results: Array = []            ## {callback, path}
+var _pending_deliveries: Array = [] ## Spillover when the main thread budget is full.
 var _exit_thread := false
 
 ## Preallocated A* scratch, invalidated per query by a stamp instead of
@@ -151,30 +152,28 @@ func _physics_process(_delta: float) -> void:
 	if _phase == BuildPhase.DONE:
 		_deliver_results()
 		return
+	var budget_start := Time.get_ticks_usec()
 	match _phase:
 		BuildPhase.SAMPLE:
 			var total := _nx * _nz
-			var end := mini(_cursor + SAMPLE_PER_FRAME, total)
 			var space := get_world_3d().direct_space_state
-			while _cursor < end:
+			while _cursor < total and Time.get_ticks_usec() - budget_start < BUILD_BUDGET_US:
 				_sample_column(space, _cursor)
 				_cursor += 1
 			if _cursor >= total:
 				_phase = BuildPhase.LINK
 				_cursor = 0
 		BuildPhase.LINK:
-			var end := mini(_cursor + LINK_PER_FRAME, _pos.size())
 			var space := get_world_3d().direct_space_state
-			while _cursor < end:
+			while _cursor < _pos.size() and Time.get_ticks_usec() - budget_start < BUILD_BUDGET_US:
 				_link_node(space, _cursor)
 				_cursor += 1
 			if _cursor >= _pos.size():
 				_phase = BuildPhase.JUMPS
 				_cursor = 0
 		BuildPhase.JUMPS:
-			var end := mini(_cursor + JUMPS_PER_FRAME, _pos.size())
 			var space := get_world_3d().direct_space_state
-			while _cursor < end:
+			while _cursor < _pos.size() and Time.get_ticks_usec() - budget_start < BUILD_BUDGET_US:
 				_link_jumps(space, _cursor)
 				_cursor += 1
 			if _cursor >= _pos.size():
@@ -193,10 +192,7 @@ func _finish_build() -> void:
 	_thread = Thread.new()
 	_thread.start(_worker_loop)
 	_phase = BuildPhase.DONE
-	var edge_count := 0
-	for e in _edges:
-		edge_count += (e as PackedInt32Array).size() / 2
-	print("NavGraph: %d nodes, %d edges (query thread up)" % [_pos.size(), edge_count])
+	print("NavGraph: %d nodes ready (query thread up)" % _pos.size())
 	build_finished.emit()
 
 
@@ -233,17 +229,32 @@ func _worker_loop() -> void:
 		_results_mutex.unlock()
 
 
-## Main thread: hand finished paths back to their requesters. Smoothing runs
-## here because it raycasts (physics space is not safe from the worker).
+## Main thread: hand finished paths back to their requesters. A strict per-frame
+## budget prevents a crowd of enemies from hitching the game when paths land.
+## Smoothing is skipped here — it raycasts and is not safe off the worker thread.
 func _deliver_results() -> void:
 	_results_mutex.lock()
-	var batch := _results
-	_results = []
+	if not _results.is_empty():
+		_pending_deliveries.append_array(_results)
+		_results.clear()
+	var batch := _pending_deliveries
+	_pending_deliveries = []
 	_results_mutex.unlock()
+
+	var delivered := 0
+	var carry: Array = []
 	for r in batch:
+		if delivered >= MAX_DELIVER_PER_FRAME:
+			carry.append(r)
+			continue
 		var cb: Callable = r["callback"]
 		if cb.is_valid():
-			cb.call(_smooth(r["path"]))
+			cb.call(r["path"])
+		delivered += 1
+	if not carry.is_empty():
+		_pending_deliveries.append_array(carry)
+	if _pending_deliveries.size() > MAX_PENDING_DELIVERIES:
+		_pending_deliveries = _pending_deliveries.slice(-MAX_PENDING_DELIVERIES)
 
 
 # --- Sampling ------------------------------------------------------------
@@ -388,7 +399,7 @@ func _link_jumps(space: PhysicsDirectSpaceState3D, i: int) -> void:
 	for dir in DIRS8:
 		if added >= 6:
 			return
-		for d in [2, 3, 4]:
+		for d in [2, 3, 4, 5]:
 			var col: PackedInt32Array = _col_nodes.get(cell + dir * d, PackedInt32Array())
 			var linked := false
 			for j in col:
@@ -464,8 +475,8 @@ func find_path(from: Vector3, to: Vector3, prof: NavAgentProfile) -> Array:
 ## Thread-safe A* core over the frozen graph: nearest nodes, stamped-array
 ## search, waypoint reconstruction. No physics access, no allocation churn.
 func _solve(from: Vector3, to: Vector3, prof: NavAgentProfile) -> Array:
-	var start := _nearest_node(from, prof)
-	var goal := _nearest_node(to, prof)
+	var start := _nearest_node(from, prof, false)
+	var goal := _nearest_node(to, prof, true)
 	if start < 0 or goal < 0 or start == goal:
 		return []
 
@@ -617,12 +628,16 @@ func _edge_cost(i: int, j: int, type: int, prof: NavAgentProfile) -> float:
 
 
 ## Closest usable node to a world position (spiral cell search).
-func _nearest_node(p: Vector3, prof: NavAgentProfile) -> int:
+## `for_goal` biases toward matching the target height (rooftops, platforms).
+func _nearest_node(p: Vector3, prof: NavAgentProfile, for_goal: bool = false) -> int:
 	var cx := int(floor((p.x - _bounds.position.x) / CELL))
 	var cz := int(floor((p.z - _bounds.position.z) / CELL))
 	var best := -1
 	var best_score := INF
-	for r in 4:
+	var max_r := 7 if for_goal else 4
+	var dy_weight := 6.0 if for_goal else 1.2
+	var max_dy := 20.0 if for_goal else 8.0
+	for r in max_r:
 		for dx in range(-r, r + 1):
 			for dz in range(-r, r + 1):
 				if maxi(absi(dx), absi(dz)) != r:
@@ -633,13 +648,13 @@ func _nearest_node(p: Vector3, prof: NavAgentProfile) -> int:
 						continue
 					var np := _pos[id]
 					var dy := absf(np.y - p.y)
-					if dy > 8.0:
+					if dy > max_dy:
 						continue
-					var score := Vector2(np.x - p.x, np.z - p.z).length() + dy * 1.2
+					var score := Vector2(np.x - p.x, np.z - p.z).length() + dy * dy_weight
 					if score < best_score:
 						best_score = score
 						best = id
-		if best >= 0 and r >= 1:
+		if not for_goal and best >= 0 and r >= 1:
 			break
 	return best
 

@@ -63,16 +63,22 @@ func latest() -> Vector3:
 
 ## Index of the crumb nearest to `pos` within `max_dist` (and a sane vertical
 ## band, so a trail on a roof does not count as "near" from the street below).
+## When `max_dy` is large (>= 8), vertical separation is weighted less so
+## enemies below can latch onto an elevated breadcrumb trail.
 ## Returns -1 when nothing qualifies.
 func nearest_index(pos: Vector3, max_dist: float, max_dy: float = 2.5) -> int:
 	var best := -1
 	var best_d := max_dist
+	var loose_y := max_dy >= 8.0
 	for i in _points.size():
 		var c := _points[i]
-		if absf(c.y - pos.y) > max_dy:
+		var dy := absf(c.y - pos.y)
+		if not loose_y and dy > max_dy:
 			continue
 		var d := Vector2(c.x - pos.x, c.z - pos.z).length()
-		if d < best_d:
+		if loose_y:
+			d += dy * 0.35
+		if d < best_d and (loose_y or dy <= max_dy):
 			best_d = d
 			best = i
 	return best

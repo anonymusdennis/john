@@ -4,8 +4,9 @@ extends MeshInstance3D
 ## Attached and toggled by NavGraph; heavier than gameplay code but only
 ## rebuilds a few times a second and only around the camera.
 
-const REBUILD_INTERVAL := 0.3
-const VIEW_RADIUS := 38.0
+const REBUILD_INTERVAL := 0.45
+const VIEW_RADIUS := 32.0
+const MAX_DRAW_NODES := 1200
 
 var graph: Node3D                   ## NavGraph (untyped to avoid cycles).
 
@@ -52,6 +53,8 @@ func _rebuild() -> void:
 	var drew := 0
 	var r2 := VIEW_RADIUS * VIEW_RADIUS
 	for i in pos.size():
+		if drew >= MAX_DRAW_NODES:
+			break
 		var p := pos[i]
 		if p.distance_squared_to(center) > r2:
 			continue
