@@ -87,6 +87,11 @@ var _punch_tween: Tween
 
 func _ready() -> void:
 	add_to_group("player")
+	# Enemies hunt the nearest "nav_target" — players, companions, anything.
+	add_to_group("nav_target")
+	# Breadcrumb trail: enemies replay this line when the nav graph cannot
+	# reach us (e.g. floating platforms we jumped across).
+	add_child(NavPathRecorder.new())
 	Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
 	_capsule = collision_shape.shape as CapsuleShape3D
 	_configure_vault_rays()
