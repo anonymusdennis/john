@@ -28,14 +28,14 @@ fog_density = 0.0008
 fog_aerial_perspective = 0.35
 
 [sub_resource type="BoxMesh" id="Mesh_ground"]
-size = Vector3(120, 1, 120)
+size = Vector3(400, 1, 400)
 
 [sub_resource type="StandardMaterial3D" id="Mat_ground"]
 albedo_color = Color(0.22, 0.28, 0.24, 1)
 roughness = 0.95
 
 [sub_resource type="BoxShape3D" id="Shape_ground"]
-size = Vector3(120, 1, 120)
+size = Vector3(400, 1, 400)
 
 [node name="Main" type="Node3D" unique_id=277950604]
 metadata/movie_file = "/home/headadmin/Videos/out.mp4"
@@ -47,7 +47,7 @@ environment = SubResource("Environment_main")
 transform = Transform3D(0.866025, -0.353553, 0.353553, 0, 0.707107, 0.707107, -0.5, -0.612372, 0.612372, 8, 40, 10)
 light_energy = 1.15
 shadow_enabled = true
-directional_shadow_max_distance = 80.0
+directional_shadow_max_distance = 120.0
 
 [node name="Ground" type="StaticBody3D" parent="." unique_id=9901059]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -0.5, 0)

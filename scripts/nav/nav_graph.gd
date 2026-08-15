@@ -37,10 +37,10 @@ const JUMP_DY_UP := 1.4
 const JUMP_DY_DOWN := 3.5
 const MAX_MARCH_HITS := 8           ## Surface levels per column (tunnels etc).
 
-const SAMPLE_PER_FRAME := 600
+const SAMPLE_PER_FRAME := 900
 const LINK_PER_FRAME := 1200
-const JUMPS_PER_FRAME := 250
-const ASTAR_MAX_EXPANSIONS := 4500
+const JUMPS_PER_FRAME := 400
+const ASTAR_MAX_EXPANSIONS := 9000
 const QUERY_BUDGET := 2             ## Max A* queries per physics frame.
 
 const DIRS4: Array[Vector2i] = [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]
