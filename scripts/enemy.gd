@@ -309,7 +309,8 @@ func _update_crowded() -> bool:
 
 ## Fair per-frame budget of query starts: first-come-first-served each
 ## physics frame; the randomized per-enemy repath cooldowns rotate who asks
-## first, so nobody is permanently starved into trail-following.
+## first, so nobody is permanently starved into trail-following. Claims the
+## slot immediately so no two callers can share one.
 func _may_pathfind() -> bool:
 	if _graph == null:
 		return false
@@ -317,7 +318,10 @@ func _may_pathfind() -> bool:
 	if f != _starts_frame:
 		_starts_frame = f
 		_starts_used = 0
-	return _starts_used < PATH_STARTS_PER_FRAME
+	if _starts_used >= PATH_STARTS_PER_FRAME:
+		return false
+	_starts_used += 1
+	return true
 
 
 # --- Territory / home --------------------------------------------------------
@@ -1256,7 +1260,6 @@ func _try_request_path() -> bool:
 				goal += Vector3(tv.x, 0.0, tv.z) * 0.4
 	if _graph.request_path(global_position, goal, _profile,
 			_on_path_result.bind(_path_gen)):
-		_starts_used += 1
 		_path_pending = true
 		_pending_purpose = purpose
 		_pending_goal = goal
@@ -1310,14 +1313,14 @@ func _on_path_result(path: Array, gen: int) -> void:
 	if _pending_purpose == PathPurpose.CHASE:
 		_graph_fail_streak = 0
 		_home_return_attempts = 0
-	_adopt_path(path, false, _pending_goal)
+	_adopt_path(path, false, _pending_goal, _pending_purpose)
 
 
-func _adopt_path(path: Array, from_trail: bool, goal: Vector3) -> void:
+func _adopt_path(path: Array, from_trail: bool, goal: Vector3, purpose: int) -> void:
 	_path = path
 	_path_i = 0
 	_path_from_trail = from_trail
-	_path_purpose = _pending_purpose if not from_trail else PathPurpose.CHASE
+	_path_purpose = purpose
 	_path_goal = goal
 	_state = State.PATH
 	if _graph != null:
@@ -1368,7 +1371,7 @@ func _try_follow_trail() -> bool:
 			continue
 		if absf(last.y - t.y) > 2.5:
 			continue
-		_adopt_path(wps, true, rec.latest())
+		_adopt_path(wps, true, rec.latest(), PathPurpose.CHASE)
 		return true
 	return false
 
