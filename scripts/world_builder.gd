@@ -10,6 +10,16 @@ const NavGraphScene = preload("res://scripts/nav/nav_graph.gd")
 @export var seed_value: int = 42
 @export var enemy_count: int = 12
 
+## Per-form navigation & physique presets: spiders wall-walk, imps and humans
+## parkour (jump + ledge climb), heavy centaurs stay ground-bound.
+const ENEMY_DEFAULTS := {
+	"human": {"nav_mode": "parkour", "grip_strength": 4.5, "move_speed": 3.6},
+	"imp": {"nav_mode": "parkour", "grip_strength": 3.8, "move_speed": 4.4, "jump_apex": 2.0, "jump_range": 7.5},
+	"centaur": {"nav_mode": "basic", "grip_strength": 7.0, "move_speed": 4.6},
+	"spider": {"nav_mode": "basic", "can_wall_walk": true, "grip_strength": 6.5, "move_speed": 3.8},
+	"centipede": {"nav_mode": "basic", "grip_strength": 5.0, "move_speed": 3.2},
+}
+
 
 func _ready() -> void:
 	var rng := RandomNumberGenerator.new()
@@ -392,7 +402,18 @@ func _spawn_enemies() -> void:
 			"pos": Vector3(cos(ang) * r, 0.1, sin(ang) * r),
 		})
 	for s in spawns.slice(0, enemy_count):
-		var enemy := EnemyScene.instantiate()
-		enemy.body_form = s["form"]
-		root.add_child(enemy)
-		enemy.global_position = s["pos"]
+		_spawn_enemy(root, s["form"], s["pos"], s.get("cfg", {}))
+
+
+## Instantiates one enemy with per-form navigation/physique defaults;
+## `overrides` may tweak any exported property (nav_mode, grip_strength, ...).
+func _spawn_enemy(root: Node3D, form: String, pos: Vector3, overrides: Dictionary = {}) -> Node3D:
+	var enemy := EnemyScene.instantiate()
+	enemy.body_form = form
+	var cfg: Dictionary = ENEMY_DEFAULTS.get(form, {}).duplicate()
+	cfg.merge(overrides, true)
+	for key in cfg:
+		enemy.set(key, cfg[key])
+	root.add_child(enemy)
+	enemy.global_position = pos
+	return enemy

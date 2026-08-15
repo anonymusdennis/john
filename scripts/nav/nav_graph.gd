@@ -41,6 +41,7 @@ const SAMPLE_PER_FRAME := 600
 const LINK_PER_FRAME := 1200
 const JUMPS_PER_FRAME := 250
 const ASTAR_MAX_EXPANSIONS := 4500
+const QUERY_BUDGET := 2             ## Max A* queries per physics frame.
 
 const DIRS4: Array[Vector2i] = [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]
 const DIRS8: Array[Vector2i] = [
@@ -53,6 +54,7 @@ var _nx: int = 0
 var _nz: int = 0
 var _phase: int = BuildPhase.IDLE
 var _cursor: int = 0
+var _queries_this_frame: int = 0
 
 ## Node storage (index = node id).
 var _pos := PackedVector3Array()
@@ -91,6 +93,11 @@ func is_ready() -> bool:
 	return _phase == BuildPhase.DONE
 
 
+## Per-frame A* budget so a crowd of repathing enemies can't hitch a frame.
+func can_query() -> bool:
+	return _phase == BuildPhase.DONE and _queries_this_frame < QUERY_BUDGET
+
+
 func node_count() -> int:
 	return _pos.size()
 
@@ -102,6 +109,7 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _physics_process(_delta: float) -> void:
+	_queries_this_frame = 0
 	match _phase:
 		BuildPhase.SAMPLE:
 			var total := _nx * _nz
@@ -351,6 +359,7 @@ func _ray_hits(space: PhysicsDirectSpaceState3D, from: Vector3, to: Vector3) -> 
 func find_path(from: Vector3, to: Vector3, prof: NavAgentProfile) -> Array:
 	if _phase != BuildPhase.DONE:
 		return []
+	_queries_this_frame += 1
 	var start := _nearest_node(from, prof)
 	var goal := _nearest_node(to, prof)
 	if start < 0 or goal < 0 or start == goal:
