@@ -351,12 +351,15 @@ func _spawn_enemies() -> void:
 	var root := Node3D.new()
 	root.name = "Enemies"
 	add_child(root)
-	var spots := [
-		Vector3(8, 0.0, -6),
-		Vector3(-8, 0.0, -10),
-		Vector3(14, 0.0, 4),
+	var spawns := [
+		{"form": "human", "pos": Vector3(8, 0.1, -6)},
+		{"form": "imp", "pos": Vector3(-8, 0.1, -18)},
+		{"form": "centaur", "pos": Vector3(14, 0.1, 4)},
+		{"form": "spider", "pos": Vector3(-6, 0.1, 14)},
+		{"form": "centipede", "pos": Vector3(0, 0.1, -16)},
 	]
-	for p in spots:
+	for s in spawns:
 		var enemy := EnemyScene.instantiate()
+		enemy.body_form = s["form"]
 		root.add_child(enemy)
-		enemy.global_position = p
+		enemy.global_position = s["pos"]
