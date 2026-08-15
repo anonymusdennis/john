@@ -70,7 +70,14 @@ func _explode() -> void:
 			var to := cb.global_position - origin
 			var dist := maxf(to.length(), 0.001)
 			var falloff := 1.0 - clampf(dist / blast_radius, 0.0, 1.0)
-			cb.velocity += to.normalized() * blast_force * 0.45 * falloff + Vector3.UP * blast_up * 0.6 * falloff
+			if cb.is_in_group("enemy") and cb.has_method("apply_knockback"):
+				# Enemies take real knockback through their impulse channel —
+				# steering can no longer erase it, and strong blasts break grip.
+				var impulse := to.normalized() * blast_force * 1.7 * falloff + Vector3.UP * blast_up * 1.3 * falloff
+				var hit_pos: Vector3 = cb.global_position + (origin - cb.global_position) * 0.35
+				cb.apply_knockback(impulse, hit_pos)
+			else:
+				cb.velocity += to.normalized() * blast_force * 0.45 * falloff + Vector3.UP * blast_up * 0.6 * falloff
 
 	_spawn_flash(origin)
 	queue_free()

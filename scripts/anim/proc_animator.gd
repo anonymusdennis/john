@@ -50,11 +50,15 @@ var _prev_body_yaw: float = 0.0
 var _yaw_rate: float = 0.0
 
 var _hand_pos: Array[Vector3] = []          ## Smoothed skeleton-space hand targets.
+var _hand_override: Array = []              ## Per arm: null or world-space Vector3 (ledge grabs).
 var _neck_strained: bool = false
 var _attacking: bool = false
 var _attack_p: float = 0.0
 var _attack_arm: int = 0
 var _next_attack_arm: int = 0
+
+var _impact_kick: Vector3 = Vector3.ZERO    ## Skeleton-space root displacement from hits.
+var _impact_spin: Vector2 = Vector2.ZERO    ## Pitch/roll kick from hits.
 
 var _noise: FastNoiseLite
 var _t: float = 0.0
@@ -106,6 +110,65 @@ func trigger_attack() -> bool:
 	return true
 
 
+## Force is emitted to body parts: the nearest segment's follow-through target
+## is shoved, the root/pitch/roll take a kick, and feet near the hit lose grip
+## and scramble to re-plant. Used by grenades, punches, and anything physical.
+func apply_impact(world_pos: Vector3, impulse: Vector3) -> void:
+	if _rig == null or _sk == null:
+		return
+	var to_skel := _sk.global_transform.affine_inverse()
+	var local_imp := to_skel.basis * impulse
+	var strength := impulse.length()
+
+	# Root kick toward the impulse + a pitch/roll reel.
+	_impact_kick = (_impact_kick + local_imp * 0.045).limit_length(0.4)
+	_impact_spin.x = clampf(_impact_spin.x - local_imp.z * 0.05, -0.35, 0.35)
+	_impact_spin.y = clampf(_impact_spin.y + local_imp.x * 0.05, -0.3, 0.3)
+
+	# Displace the nearest follow-through segment so long bodies whip visibly.
+	if not _seg_world_pos.is_empty():
+		var nearest := 0
+		var best := INF
+		for i in _seg_world_pos.size():
+			var d := _seg_world_pos[i].distance_squared_to(world_pos)
+			if d < best:
+				best = d
+				nearest = i
+		_seg_world_pos[nearest] += impulse.limit_length(3.0) * 0.12
+
+	# Per-foot micro grip: feet near the hit release and must re-plant.
+	var break_radius := 0.6 + clampf(strength * 0.12, 0.0, 1.4)
+	for leg in _legs:
+		if leg.foot_pos.distance_to(world_pos) <= break_radius:
+			leg.initialized = false
+			leg.stepping = false
+	_bounce = maxf(_bounce - clampf(strength * 0.02, 0.02, 0.1), -0.14)
+
+
+## Full grip override: every planted foot lets go at once (blast knock-offs).
+func release_all_feet() -> void:
+	for leg in _legs:
+		leg.initialized = false
+		leg.stepping = false
+
+
+## Pins one hand to a world-space point (ledge grabbing); pass INF to release.
+func set_hand_override(index: int, world_pos: Vector3) -> void:
+	if _hand_override.size() != _rig.arms.size():
+		_hand_override.resize(_rig.arms.size())
+	if index >= 0 and index < _hand_override.size():
+		_hand_override[index] = null if world_pos == Vector3.INF else world_pos
+
+
+func clear_hand_overrides() -> void:
+	for i in _hand_override.size():
+		_hand_override[i] = null
+
+
+func arm_count() -> int:
+	return 0 if _rig == null else _rig.arms.size()
+
+
 func _physics_process(delta: float) -> void:
 	if _rig == null or _sk == null:
 		return
@@ -116,6 +179,8 @@ func _physics_process(delta: float) -> void:
 			_attacking = false
 	_accel_smooth = ProcIK.damp_vec(_accel_smooth, (_vel - _prev_vel) / maxf(delta, 0.001), 6.0, delta)
 	_prev_vel = _vel
+	_impact_kick = ProcIK.damp_vec(_impact_kick, Vector3.ZERO, 5.0, delta)
+	_impact_spin = _impact_spin.lerp(Vector2.ZERO, clampf(5.0 * delta, 0.0, 1.0))
 	var body_yaw := global_transform.basis.get_euler().y
 	_yaw_rate = ProcIK.damp_float(_yaw_rate, wrapf(body_yaw - _prev_body_yaw, -PI, PI) / maxf(delta, 0.001), 8.0, delta)
 	_prev_body_yaw = body_yaw
@@ -215,10 +280,12 @@ func _build_neighbor_rule() -> void:
 
 func _init_arms() -> void:
 	_hand_pos.clear()
+	_hand_override.clear()
 	for i in _rig.arms.size():
 		var arm_plan: ProcBodyPlan.ArmPlan = _rig.arms[i]["plan"]
 		var rest := _seg_rest_pos[arm_plan.segment] + arm_plan.shoulder_offset + Vector3(0.0, -(arm_plan.upper_len + arm_plan.lower_len) * 0.85, 0.0)
 		_hand_pos.append(rest)
+		_hand_override.append(null)
 
 
 # --- Gait --------------------------------------------------------------------
@@ -289,9 +356,12 @@ func _update_gait(delta: float, to_skel: Transform3D) -> void:
 			_bounce = maxf(_bounce - 0.015, -0.09)
 
 
+## Feet probe along the BODY's up axis (not world down), so wall-walking
+## bodies plant their feet on walls and ceilings just like floors.
 func _ray_ground(around: Vector3) -> Dictionary:
-	var from := around + Vector3.UP * (plan.ride_height * 0.8 + 0.4)
-	var to := around + Vector3.DOWN * (plan.ride_height + 1.2)
+	var up := _sk.global_transform.basis.y.normalized()
+	var from := around + up * (plan.ride_height * 0.8 + 0.4)
+	var to := around - up * (plan.ride_height + 1.2)
 	var space := get_world_3d().direct_space_state
 	var query := PhysicsRayQueryParameters3D.create(from, to)
 	query.collision_mask = ground_mask
@@ -299,7 +369,7 @@ func _ray_ground(around: Vector3) -> Dictionary:
 		query.exclude = [_body.get_rid()]
 	var hit := space.intersect_ray(query)
 	if hit.is_empty():
-		return {"pos": Vector3(around.x, global_position.y, around.z), "normal": Vector3.UP}
+		return {"pos": around, "normal": up}
 	return {"pos": hit["position"], "normal": hit["normal"]}
 
 
@@ -363,6 +433,8 @@ func _solve_spine(delta: float, to_skel: Transform3D) -> Array[Transform3D]:
 	var local_acc := global_transform.basis.inverse() * _accel_smooth
 	want_pitch += clampf(local_acc.z * 0.02, -0.12, 0.12)
 	want_roll += clampf(-_yaw_rate * 0.06, -0.1, 0.1)
+	want_pitch += _impact_spin.x
+	want_roll += _impact_spin.y
 	if _attacking and _rig.arms.is_empty():
 		want_pitch -= _strike_curve() * 0.35
 
@@ -401,7 +473,7 @@ func _solve_spine(delta: float, to_skel: Transform3D) -> Array[Transform3D]:
 	# --- Joint positions -------------------------------------------------
 	var pos: Array[Vector3] = []
 	pos.resize(n)
-	pos[0] = Vector3(_seg_rest_pos[0].x, _root_h + _bounce, _seg_rest_pos[0].z) + noise_xz + lunge
+	pos[0] = Vector3(_seg_rest_pos[0].x, _root_h + _bounce, _seg_rest_pos[0].z) + noise_xz + lunge + _impact_kick
 	var tilt := Basis(Vector3.RIGHT, _pitch) * Basis(Vector3(0, 0, 1), _roll)
 	var world := _sk.global_transform
 	for i in range(1, n):
@@ -596,7 +668,12 @@ func _solve_arms(delta: float, to_skel: Transform3D, spine: Array[Transform3D]) 
 		if _look_target != null:
 			aim_dir = (to_skel * (_look_target.global_position + Vector3.UP) - shoulder)
 
-		if _attacking and i == _attack_arm and not _rig.arms.is_empty():
+		if i < _hand_override.size() and _hand_override[i] != null:
+			# Ledge grab: pin the hand to its world-space hold.
+			target = to_skel * (_hand_override[i] as Vector3)
+			pole = shoulder + Vector3(side * 0.4, 0.3, -0.2)
+			snappy = 26.0
+		elif _attacking and i == _attack_arm and not _rig.arms.is_empty():
 			var strike_to := shoulder + Vector3(side * 0.05, 0.05, -reach * 0.98)
 			if aim_dir != Vector3.ZERO:
 				strike_to = shoulder + aim_dir.normalized() * minf(aim_dir.length(), reach * 0.98)
