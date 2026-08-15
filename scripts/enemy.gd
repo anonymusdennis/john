@@ -435,7 +435,10 @@ func _begin_jump(target: Vector3) -> void:
 	var t_down := sqrt(2.0 * maxf(apex - dy, 0.05) / _gravity)
 	var t_total := maxf(t_up + t_down, 0.15)
 	var flat := Vector3(target.x - global_position.x, 0.0, target.z - global_position.z)
-	velocity = flat / t_total + Vector3.UP * v_y
+	var hv := flat / t_total
+	if hv.length() > 15.0:
+		hv = hv.normalized() * 15.0
+	velocity = hv + Vector3.UP * v_y
 	_face_toward(flat)
 	_jump_target = target
 	_jump_time = t_total + 0.4
