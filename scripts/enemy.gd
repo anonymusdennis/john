@@ -78,7 +78,10 @@ var _path: Array = []
 var _path_i: int = 0
 var _path_from_trail: bool = false          ## Current path replays the target's trail.
 var _path_pending: bool = false             ## An async graph query is in flight.
+var _path_gen: int = 0                      ## Request serial; stale results are dropped.
 var _pending_timeout: float = 0.0
+
+const PATH_REQUEST_TIMEOUT := 3.0           ## Give up waiting on a query after this.
 var _repath_timer: float = 0.0
 var _path_goal: Vector3 = Vector3.INF
 var _stuck_timer: float = 0.0
@@ -148,6 +151,7 @@ func _physics_process(delta: float) -> void:
 		_pending_timeout -= delta
 		if _pending_timeout <= 0.0:
 			_path_pending = false
+			_path_gen += 1  # Invalidate the in-flight result so it can't land stale.
 	_acquire_target(delta)
 	if _graph == null:
 		_graph = get_tree().get_first_node_in_group("nav_graph") as NavGraph
@@ -646,16 +650,20 @@ func _try_request_path() -> bool:
 	if _repath_timer > 0.0 or not _graph.can_query():
 		return false
 	_repath_timer = 0.9 + randf() * 0.5
-	if _graph.request_path(global_position, _target.global_position, _profile, _on_path_result):
+	_path_gen += 1
+	if _graph.request_path(global_position, _target.global_position, _profile,
+			_on_path_result.bind(_path_gen)):
 		_path_pending = true
-		_pending_timeout = 3.0
+		_pending_timeout = PATH_REQUEST_TIMEOUT
 		return true
 	return false
 
 
 ## Main-thread delivery of a solved path. Empty result = the graph cannot
 ## reach the target -> fall back to replaying the target's recorded trail.
-func _on_path_result(path: Array) -> void:
+func _on_path_result(path: Array, gen: int) -> void:
+	if gen != _path_gen:
+		return  # Superseded or timed-out request; a fresher one is in charge.
 	_path_pending = false
 	if _state == State.LAUNCHED or _state == State.RECOVER \
 			or _state == State.JUMPING or _state == State.CLIMBING or _on_wall_surface():
