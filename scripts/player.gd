@@ -41,6 +41,12 @@ const GROUP_GRABBABLE := &"grabbable"
 @export var push_strength: float = 14.0
 @export var push_min_player_speed: float = 0.15
 
+@export_group("Punch")
+@export var punch_reach: float = 2.2
+@export var punch_radius: float = 0.8
+@export var punch_impulse: float = 14.0
+@export var punch_cooldown: float = 0.45
+
 @export_group("Vault")
 @export var vault_enabled: bool = true
 @export var vault_forward_reach: float = 0.85
@@ -75,6 +81,8 @@ const GrenadeProjectile = preload("res://scripts/grenade_projectile.gd")
 const PhysicsObject = preload("res://scripts/physics_object.gd")
 
 var _throw_cooldown: float = 0.0
+var _punch_cd: float = 0.0
+var _punch_tween: Tween
 
 
 func _ready() -> void:
@@ -110,6 +118,11 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		return
 
+	if event.is_action_pressed("punch"):
+		_try_punch()
+		get_viewport().set_input_as_handled()
+		return
+
 	if event is InputEventMouseMotion:
 		_look(event.relative.x * mouse_sensitivity, event.relative.y * mouse_sensitivity)
 		get_viewport().set_input_as_handled()
@@ -118,6 +131,7 @@ func _unhandled_input(event: InputEvent) -> void:
 func _physics_process(delta: float) -> void:
 	_vault_cooldown_timer = maxf(_vault_cooldown_timer - delta, 0.0)
 	_throw_cooldown = maxf(_throw_cooldown - delta, 0.0)
+	_punch_cd = maxf(_punch_cd - delta, 0.0)
 
 	if _is_vaulting:
 		return
@@ -153,6 +167,94 @@ func _try_use_selected_item() -> void:
 			return
 		_throw_grenade()
 		_throw_cooldown = 0.35
+
+
+## Simple punch: a forgiving sphere probe in front of the camera. Enemies get
+## a knockback impulse aimed at the exact hit point (their body parts reel);
+## rigid props get shoved. A tiny camera jab sells the swing.
+func _try_punch() -> void:
+	if _punch_cd > 0.0:
+		return
+	_punch_cd = punch_cooldown
+	_play_punch_feedback()
+
+	var aim := -camera.global_transform.basis.z
+	var eye := camera.global_position
+	var center := eye + aim * (punch_reach * 0.65)
+	var space := get_world_3d().direct_space_state
+
+	var sphere := SphereShape3D.new()
+	sphere.radius = punch_radius
+	var params := PhysicsShapeQueryParameters3D.new()
+	params.shape = sphere
+	params.transform = Transform3D(Basis.IDENTITY, center)
+	params.collision_mask = 1 | 2
+	params.exclude = [get_rid()]
+	var hits := space.intersect_shape(params, 12)
+
+	var hit_something := false
+	for hit in hits:
+		var collider: Variant = hit.get("collider")
+		if collider is Node3D:
+			var node := collider as Node3D
+			var to_target := (node.global_position - eye)
+			if to_target.dot(aim) <= 0.0:
+				continue
+			var hit_point := _punch_hit_point(node, eye, aim)
+			var impulse := (aim + Vector3.UP * 0.2).normalized() * punch_impulse + Vector3(velocity.x, 0.0, velocity.z) * 0.4
+			if node.is_in_group("enemy") and node.has_method("apply_knockback"):
+				node.apply_knockback(impulse, hit_point)
+				hit_something = true
+			elif node is RigidBody3D:
+				var rb := node as RigidBody3D
+				rb.apply_impulse(impulse * 0.6, hit_point - rb.global_position)
+				hit_something = true
+	if hit_something:
+		_spawn_punch_flash(eye + aim * punch_reach * 0.7)
+
+
+## Precise contact point: ray toward the body, fall back to its center.
+func _punch_hit_point(node: Node3D, eye: Vector3, aim: Vector3) -> Vector3:
+	var space := get_world_3d().direct_space_state
+	var query := PhysicsRayQueryParameters3D.create(eye, eye + aim * (punch_reach + 0.6))
+	query.exclude = [get_rid()]
+	query.collision_mask = 1 | 2
+	var hit := space.intersect_ray(query)
+	if not hit.is_empty() and hit.get("collider") == node:
+		return hit["position"]
+	return node.global_position + Vector3.UP * 0.5
+
+
+## First-person arm-jab stub: quick camera push-in and back.
+func _play_punch_feedback() -> void:
+	if _punch_tween and _punch_tween.is_running():
+		_punch_tween.kill()
+	var base_z := 0.0
+	_punch_tween = create_tween()
+	_punch_tween.tween_property(camera, "position:z", base_z - 0.14, 0.05)
+	_punch_tween.tween_property(camera, "position:z", base_z, 0.16)
+
+
+func _spawn_punch_flash(at: Vector3) -> void:
+	var flash := MeshInstance3D.new()
+	var sphere := SphereMesh.new()
+	sphere.radius = 0.16
+	sphere.height = 0.32
+	flash.mesh = sphere
+	var mat := StandardMaterial3D.new()
+	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	mat.albedo_color = Color(1.0, 0.95, 0.75, 0.9)
+	mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	flash.material_override = mat
+	var scene := get_tree().current_scene
+	if scene == null:
+		return
+	scene.add_child(flash)
+	flash.global_position = at
+	var tw := flash.create_tween()
+	tw.tween_property(flash, "scale", Vector3.ONE * 2.2, 0.12)
+	tw.parallel().tween_property(mat, "albedo_color:a", 0.0, 0.12)
+	tw.tween_callback(flash.queue_free)
 
 
 func _throw_grenade() -> void:
