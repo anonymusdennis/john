@@ -17,6 +17,12 @@ extends Node3D
 ##   WALL  vertical face traversal (wall walkers only)
 ##
 ## The build is chunked across frames so the 10x map never hitches at load.
+##
+## Queries run on a dedicated worker thread: agents call request_path() and
+## receive their route via callback a frame or two later, so even a crowd of
+## expensive parkour searches can never freeze the game. The graph is
+## immutable once built, making concurrent reads safe; A* itself uses
+## preallocated stamped arrays instead of per-query dictionaries.
 
 signal build_finished
 
@@ -41,7 +47,8 @@ const SAMPLE_PER_FRAME := 900
 const LINK_PER_FRAME := 1200
 const JUMPS_PER_FRAME := 400
 const ASTAR_MAX_EXPANSIONS := 9000
-const QUERY_BUDGET := 2             ## Max A* queries per physics frame.
+const MAX_PENDING := 24             ## Max queued async path requests.
+const HEURISTIC_WEIGHT := 1.12      ## Slightly greedy A* = far fewer expansions.
 
 const DIRS4: Array[Vector2i] = [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]
 const DIRS8: Array[Vector2i] = [
@@ -54,7 +61,6 @@ var _nx: int = 0
 var _nz: int = 0
 var _phase: int = BuildPhase.IDLE
 var _cursor: int = 0
-var _queries_this_frame: int = 0
 
 ## Node storage (index = node id).
 var _pos := PackedVector3Array()
@@ -62,6 +68,26 @@ var _headroom := PackedFloat32Array()
 var _clear_r := PackedFloat32Array()
 var _col_nodes := {}                ## Vector2i cell -> PackedInt32Array node ids.
 var _edges: Array = []              ## Per node: PackedInt32Array [to, type, to, type, ...].
+
+## Threaded query pipeline. Graph data is frozen after build, so the worker
+## only ever reads it; requests/results cross threads under small mutexes.
+var _thread: Thread
+var _sem := Semaphore.new()
+var _queue_mutex := Mutex.new()
+var _results_mutex := Mutex.new()
+var _astar_mutex := Mutex.new()     ## Guards the shared A* scratch arrays.
+var _requests: Array = []           ## {from, to, prof, callback}
+var _results: Array = []            ## {callback, path}
+var _exit_thread := false
+
+## Preallocated A* scratch, invalidated per query by a stamp instead of
+## clearing — removes all per-query Dictionary allocation and hashing.
+var _g := PackedFloat32Array()
+var _came := PackedInt32Array()
+var _cmove := PackedInt32Array()
+var _open_stamp := PackedInt32Array()
+var _closed_stamp := PackedInt32Array()
+var _query_stamp: int = 0
 
 ## Live debug data (F4): enemies publish their current path here.
 var debug_enabled := false
@@ -80,6 +106,14 @@ func _ready() -> void:
 	add_child(_debug_draw)
 
 
+func _exit_tree() -> void:
+	if _thread != null:
+		_exit_thread = true
+		_sem.post()
+		_thread.wait_to_finish()
+		_thread = null
+
+
 ## Kicks off the asynchronous build over the given world bounds.
 func configure(bounds: AABB) -> void:
 	_bounds = bounds
@@ -93,9 +127,14 @@ func is_ready() -> bool:
 	return _phase == BuildPhase.DONE
 
 
-## Per-frame A* budget so a crowd of repathing enemies can't hitch a frame.
+## Whether a new async path request would be accepted right now.
 func can_query() -> bool:
-	return _phase == BuildPhase.DONE and _queries_this_frame < QUERY_BUDGET
+	if _phase != BuildPhase.DONE:
+		return false
+	_queue_mutex.lock()
+	var pending := _requests.size()
+	_queue_mutex.unlock()
+	return pending < MAX_PENDING
 
 
 func node_count() -> int:
@@ -109,7 +148,9 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _physics_process(_delta: float) -> void:
-	_queries_this_frame = 0
+	if _phase == BuildPhase.DONE:
+		_deliver_results()
+		return
 	match _phase:
 		BuildPhase.SAMPLE:
 			var total := _nx * _nz
@@ -137,12 +178,72 @@ func _physics_process(_delta: float) -> void:
 				_link_jumps(space, _cursor)
 				_cursor += 1
 			if _cursor >= _pos.size():
-				_phase = BuildPhase.DONE
-				var edge_count := 0
-				for e in _edges:
-					edge_count += (e as PackedInt32Array).size() / 2
-				print("NavGraph: %d nodes, %d edges" % [_pos.size(), edge_count])
-				build_finished.emit()
+				_finish_build()
+
+
+func _finish_build() -> void:
+	var n := _pos.size()
+	_g.resize(n)
+	_came.resize(n)
+	_cmove.resize(n)
+	_open_stamp.resize(n)
+	_open_stamp.fill(0)
+	_closed_stamp.resize(n)
+	_closed_stamp.fill(0)
+	_thread = Thread.new()
+	_thread.start(_worker_loop)
+	_phase = BuildPhase.DONE
+	var edge_count := 0
+	for e in _edges:
+		edge_count += (e as PackedInt32Array).size() / 2
+	print("NavGraph: %d nodes, %d edges (query thread up)" % [_pos.size(), edge_count])
+	build_finished.emit()
+
+
+# --- Threaded queries -------------------------------------------------------
+
+## Queues an async path query; `callback` is invoked on the main thread with
+## the waypoint Array (possibly empty) once the worker has solved it.
+## Returns false when the graph is not ready or the queue is saturated.
+func request_path(from: Vector3, to: Vector3, prof: NavAgentProfile, callback: Callable) -> bool:
+	if not can_query():
+		return false
+	_queue_mutex.lock()
+	_requests.push_back({"from": from, "to": to, "prof": prof, "callback": callback})
+	_queue_mutex.unlock()
+	_sem.post()
+	return true
+
+
+func _worker_loop() -> void:
+	while true:
+		_sem.wait()
+		if _exit_thread:
+			return
+		_queue_mutex.lock()
+		if _requests.is_empty():
+			_queue_mutex.unlock()
+			continue
+		var req: Dictionary = _requests.pop_front()
+		_queue_mutex.unlock()
+
+		var path := _solve(req["from"], req["to"], req["prof"])
+		_results_mutex.lock()
+		_results.push_back({"callback": req["callback"], "path": path})
+		_results_mutex.unlock()
+
+
+## Main thread: hand finished paths back to their requesters. Smoothing runs
+## here because it raycasts (physics space is not safe from the worker).
+func _deliver_results() -> void:
+	_results_mutex.lock()
+	var batch := _results
+	_results = []
+	_results_mutex.unlock()
+	for r in batch:
+		var cb: Callable = r["callback"]
+		if cb.is_valid():
+			cb.call(_smooth(r["path"]))
 
 
 # --- Sampling ------------------------------------------------------------
@@ -352,26 +453,30 @@ func _ray_hits(space: PhysicsDirectSpaceState3D, from: Vector3, to: Vector3) -> 
 
 # --- Query -------------------------------------------------------------------
 
-## A* over the typed graph, filtered by the agent profile. Returns waypoints
-## as dictionaries: {"pos": Vector3, "move": Edge} where "move" describes how
-## to travel from the previous waypoint to this one. Empty when unreachable
-## (callers fall back to direct steering).
+## Synchronous query (main thread only — smoothing raycasts). Prefer
+## request_path(); this exists for tools and one-shot uses.
 func find_path(from: Vector3, to: Vector3, prof: NavAgentProfile) -> Array:
 	if _phase != BuildPhase.DONE:
 		return []
-	_queries_this_frame += 1
+	return _smooth(_solve(from, to, prof))
+
+
+## Thread-safe A* core over the frozen graph: nearest nodes, stamped-array
+## search, waypoint reconstruction. No physics access, no allocation churn.
+func _solve(from: Vector3, to: Vector3, prof: NavAgentProfile) -> Array:
 	var start := _nearest_node(from, prof)
 	var goal := _nearest_node(to, prof)
 	if start < 0 or goal < 0 or start == goal:
 		return []
 
+	_astar_mutex.lock()
+	_query_stamp += 1
+	var stamp := _query_stamp
 	var goal_pos := _pos[goal]
 	var open: Array[Vector2] = []       # (f, id) binary min-heap.
-	var g_score := {}
-	var came_from := {}
-	var came_move := {}
-	var closed := {}
-	g_score[start] = 0.0
+	_g[start] = 0.0
+	_came[start] = -1
+	_open_stamp[start] = stamp
 	_heap_push(open, Vector2(_pos[start].distance_to(goal_pos), float(start)))
 
 	var best := start
@@ -382,9 +487,9 @@ func find_path(from: Vector3, to: Vector3, prof: NavAgentProfile) -> Array:
 	while not open.is_empty():
 		var top := _heap_pop(open)
 		var current := int(top.y)
-		if closed.has(current):
+		if _closed_stamp[current] == stamp:
 			continue
-		closed[current] = true
+		_closed_stamp[current] = stamp
 		expansions += 1
 		if current == goal:
 			found = true
@@ -392,13 +497,12 @@ func find_path(from: Vector3, to: Vector3, prof: NavAgentProfile) -> Array:
 		if expansions > ASTAR_MAX_EXPANSIONS:
 			break
 
-		var cur_pos := _pos[current]
-		var cur_g: float = g_score[current]
+		var cur_g := _g[current]
 		var e := _edges[current] as PackedInt32Array
 		for k in range(0, e.size(), 2):
 			var nb := e[k]
 			var type := e[k + 1]
-			if closed.has(nb):
+			if _closed_stamp[nb] == stamp:
 				continue
 			if not _node_fits(nb, prof):
 				continue
@@ -406,41 +510,45 @@ func find_path(from: Vector3, to: Vector3, prof: NavAgentProfile) -> Array:
 			if cost < 0.0:
 				continue
 			var tentative := cur_g + cost
-			if tentative < float(g_score.get(nb, INF)):
-				g_score[nb] = tentative
-				came_from[nb] = current
-				came_move[nb] = type
+			if _open_stamp[nb] != stamp or tentative < _g[nb]:
+				_g[nb] = tentative
+				_came[nb] = current
+				_cmove[nb] = type
+				_open_stamp[nb] = stamp
 				var h := _pos[nb].distance_to(goal_pos)
 				if h < best_h:
 					best_h = h
 					best = nb
-				_heap_push(open, Vector2(tentative + h, float(nb)))
+				_heap_push(open, Vector2(tentative + h * HEURISTIC_WEIGHT, float(nb)))
 
 	var end_node := goal if found else best
 	if not found:
 		# Partial paths are only useful if they get meaningfully closer.
 		if _pos[start].distance_to(goal_pos) - best_h < 3.0:
+			_astar_mutex.unlock()
 			return []
-	return _reconstruct(start, end_node, came_from, came_move)
+	var out := _reconstruct(start, end_node)
+	_astar_mutex.unlock()
+	return out
 
 
-func _reconstruct(start: int, end_node: int, came_from: Dictionary, came_move: Dictionary) -> Array:
+func _reconstruct(start: int, end_node: int) -> Array:
 	var chain: Array[int] = []
 	var moves: Array[int] = []
 	var cur := end_node
 	while cur != start:
 		chain.append(cur)
-		moves.append(int(came_move.get(cur, Edge.WALK)))
-		if not came_from.has(cur):
+		moves.append(_cmove[cur])
+		cur = _came[cur]
+		if cur < 0:
 			return []
-		cur = came_from[cur]
 	chain.reverse()
 	moves.reverse()
 
 	var out: Array = []
 	for idx in chain.size():
 		out.append({"pos": _pos[chain[idx]], "move": moves[idx]})
-	return _smooth(out)
+	return out
 
 
 ## Greedy line-of-sight smoothing across consecutive WALK waypoints only —
