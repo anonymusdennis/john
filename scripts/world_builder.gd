@@ -64,9 +64,12 @@ func _start_nav_graph() -> void:
 	var graph := NavGraphScene.new()
 	graph.name = "NavGraph"
 	add_child(graph)
-	# Spawn plaza + nearby playground only. The full 400×400 map was baking
-	# ~100k nav nodes and freezing the main thread ~5 s into play.
-	graph.configure(AABB(Vector3(-75, -6, -75), Vector3(150, 50, 150)))
+	# Covers the plaza AND every feature district (they sit within ±180), so
+	# zone enemies get real graph routes instead of trail-only fallbacks.
+	# The build is time-budgeted per frame, so the larger bake streams in
+	# progressively instead of freezing the main thread like the old
+	# monolithic 400×400 bake did.
+	graph.configure(AABB(Vector3(-180, -6, -180), Vector3(360, 56, 360)))
 
 
 func _mat(color: Color, rough: float = 0.8, metal: float = 0.0) -> StandardMaterial3D:
