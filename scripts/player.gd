@@ -229,6 +229,8 @@ func _punch_hit_point(node: Node3D, eye: Vector3, aim: Vector3) -> Vector3:
 func _play_punch_feedback() -> void:
 	if _punch_tween and _punch_tween.is_running():
 		_punch_tween.kill()
+	# The camera's rest local z is always 0 in both camera modes — the
+	# SpringArm3D's spring_length provides the third-person offset instead.
 	var base_z := 0.0
 	_punch_tween = create_tween()
 	_punch_tween.tween_property(camera, "position:z", base_z - 0.14, 0.05)

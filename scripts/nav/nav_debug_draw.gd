@@ -71,10 +71,10 @@ func _rebuild() -> void:
 			var t := e[k + 1]
 			var col := Color.TRANSPARENT
 			match t:
-				1: col = Color(0.95, 0.9, 0.2, 1.0)     # STEP yellow
-				3: col = Color(1.0, 0.55, 0.1, 1.0)     # JUMP orange
-				4: col = Color(0.9, 0.2, 0.9, 1.0)      # CLIMB magenta
-				5: col = Color(0.95, 0.15, 0.15, 1.0)   # WALL red
+				NavGraph.Edge.STEP: col = Color(0.95, 0.9, 0.2, 1.0)      # yellow
+				NavGraph.Edge.JUMP: col = Color(1.0, 0.55, 0.1, 1.0)      # orange
+				NavGraph.Edge.CLIMB: col = Color(0.9, 0.2, 0.9, 1.0)      # magenta
+				NavGraph.Edge.WALL: col = Color(0.95, 0.15, 0.15, 1.0)    # red
 			if col.a <= 0.0:
 				continue
 			_mesh.surface_set_color(col)
