@@ -6,6 +6,95 @@
 
 ---
 
+## REWORK (this session) — route acquisition redesigned
+
+The tiered fallback was rebuilt so the graph is primary and trail replay is a
+validated last resort. Bad decisions reversed, in order:
+
+### A. Route priority fixed (`enemy.gd`)
+- `_process_chase()` smart-route branch now: **graph request → validated trail
+  (last resort) → reactive probes → keep closing in while the graph thinks**.
+  Previously any empty/pending graph result dropped straight into trail replay.
+- `_on_path_result()` no longer calls `_try_follow_trail()` on an empty result.
+  Empty chase results feed `_graph_fail_streak` (with a 6 s decay window);
+  the trail is only considered after **2+ consecutive confirmed failures**
+  and never while a query is pending or the graph is still building.
+- Chase queries now target `_get_chase_point()` (player's **ground** position,
+  velocity-led) instead of the raw player position.
+
+### B. Trail replay validated, never blind (`enemy.gd`, `path_recorder.gd`)
+- `_try_follow_trail()`: join radius 12 m → **8 m**; join height comes from
+  `_trail_join_dy()` (ability-derived: step/jump/climb/wall) instead of a
+  blanket 18 m; the validated waypoint line must **end within 4 m flat /
+  2.5 m Y of the player's current position** or it is rejected — truncated
+  replays to nowhere are gone.
+- `nearest_index()` in the recorder now **always enforces the vertical band**
+  (the old `loose_y` mode ignored `max_dy` entirely, letting street-level
+  enemies latch onto rooftop crumbs).
+- `_should_abandon_trail()` is now route-based: player left their own trail
+  tip, player left where **this path is headed** (`_path_goal`), or a direct
+  route to the player became viable → abandon immediately (`_on_route_failed`).
+  While replaying a trail the enemy keeps re-querying the graph so a real
+  route takes over ASAP.
+
+### C. Fair pathfinding (`enemy.gd`)
+- `MAX_PATHFINDERS`/wave-slot (`instance_id % 8`) deleted. Replaced with a
+  **per-physics-frame budget of query starts** (`PATH_STARTS_PER_FRAME = 3`,
+  static counters) + each enemy's existing randomized 0.75–1.2 s repath
+  cooldown. Everyone gets a turn; nobody is starved into trail-following.
+
+### D. Nav graph precision restored (`nav_graph.gd`, `world_builder.gd`)
+- `CELL` 3.0 → **2.0** (stairs/step geometry sampled again).
+- Bake bounds 150×150 → **360×360** (`AABB(-180,-6,-180)`) — every feature
+  district is on-graph again. Build stays time-budgeted (`BUILD_BUDGET_US`
+  3500 → 5000) and completes in ~5–10 s of play without a single hitch;
+  32.7k nodes verified headless.
+- `ASTAR_MAX_EXPANSIONS` 3500 → **8000** (worker thread only).
+- `MAX_PENDING` 8 → **16**, `MAX_DELIVER_PER_FRAME` 2 → **4** (delivery is
+  cheap; caps kept).
+- **`_simplify()`** added on the worker: pure-geometry waypoint thinning
+  (no raycasts, thread-safe) removes the grid zigzag that raycast `_smooth()`
+  used to fix on the main thread. `_smooth()` remains for sync `find_path()`.
+
+### E. Smart-route thresholds tightened (`enemy.gd`)
+- The `absf(to_target.y) > 0.75` trigger is **gone** — flat-ground chase never
+  pathfinds. Triggers now: rise > `max_step_height + 0.25`, drop beyond
+  `max_drop + 0.5`, stuck > 0.8 s / no progress > 0.9 s, or cached
+  "direct route not viable".
+- `_direct_route_viable()` tolerates safe drops (up to `max_drop`) instead of
+  demanding step-height flatness both ways, and fixes a bug where the
+  target delta was offset by the enemy position twice.
+- `_is_blocked_ahead()` probes at `max_step_height + 0.15` so hoppable curbs
+  no longer count as blockers (flank checks also actually test the flank
+  direction now — they compared the cached forward result before).
+
+### F. Home / roam actually pathfind (`enemy.gd`)
+- Paths are tagged with `PathPurpose` (CHASE / HOME / ROAM) at request time.
+  Results for a stale purpose are dropped; home/roam paths are never
+  retargeted at the player, and `_clear_path()` returns the enemy to the
+  state the path was for.
+- Fixed an oscillation bug: territory brain used to re-enter RETURN_HOME
+  every frame while a home path was being followed (killing it), and
+  re-engaged chase at 36 m while `return_distance` sent it home at 30 m —
+  an infinite flip-flop. Re-engage now uses hysteresis at
+  `min(chase_range, return_distance) * 0.7`.
+- RETURN_HOME requests graph paths on cooldown and probes ledges when stuck;
+  ROAM pathfinds to goals >3 m away and re-picks blocked goals instead of
+  grinding into fences. `_on_route_failed()` near the player just re-chases;
+  far away it heads home; after `max_home_return_attempts` (5) the enemy
+  adopts its current spot as home and roams (all still per-spawn tunable).
+
+### G. Kept working fixes
+Enemy collision layer 8 split, budgeted build + capped deliveries, no
+recursive `_process_chase`/`_process_path`, air steering + wall slide,
+knockback friction + `replant_feet()`, horizontal ground chase point when
+the player is airborne, crowded-skip, LOD sleep.
+
+**Headless verified:** `--headless --quit-after 2000` → zero script errors,
+`NavGraph: 32738 nodes ready`, graph ready between frames 300–600.
+
+---
+
 ## Session arc (last ~10 messages)
 
 1. **Enemy procedural animation + foot IK** — earlier work (proc_animator system, not the older `enemy_procedural_anim.gd` plan).
@@ -193,7 +282,7 @@ Fixes dogpile freeze when landing on enemy pile.
 
 ---
 
-## Known bad decisions / still broken
+## Known bad decisions / still broken — **ALL ADDRESSED by the rework above; kept for history**
 
 ### 1. Trail following prioritized over graph (MAIN REGRESSION)
 `_try_follow_trail()` runs when graph path is empty **even if graph could eventually solve**. Trail is treated as "proven route" but encodes **player-only affordances** (vault, sprint momentum, grabbable edges, narrower collision).

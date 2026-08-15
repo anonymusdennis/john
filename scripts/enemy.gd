@@ -10,16 +10,20 @@ extends CharacterBody3D
 ##   LAUNCHED  knockback broke this body's grip - ballistic tumble, no steering
 ##   RECOVER   brief stagger after landing
 ##
-## Route acquisition is a three-tier fallback, all multiplayer-aware (the
-## enemy hunts the nearest member of the "nav_target" group — any player or
-## companion):
+## Route acquisition is prioritized, all multiplayer-aware (the enemy hunts
+## the nearest member of the "nav_target" group — any player or companion):
 ##   1. direct steering when the target is roughly level and visible
-##   2. async NavGraph query (solved on the graph's worker thread — requesting
-##      a path never freezes a frame)
-##   3. the target's own NavPathRecorder trail: if the graph cannot reach a
-##      floating platform but the target walked/jumped there, the enemy
-##      replays the target's proven line, classifying each trail segment
-##      against its own abilities (jump / ledge-climb / wall-walk).
+##   2. async NavGraph query to the target's CURRENT ground position (solved
+##      on the graph's worker thread — requesting a path never freezes a
+##      frame); while a query is pending the enemy keeps closing in
+##   3. local reactive probes (step-up hop, jump lip, climb lip) when stuck
+##   4. LAST RESORT: the target's own NavPathRecorder trail — only after the
+##      graph has repeatedly confirmed it cannot reach, and only when every
+##      trail segment validates against THIS body's abilities AND the
+##      validated line actually ends near the target (never a blind replay
+##      of the player's footsteps).
+## When nothing works or the target is out of reach, the enemy returns to
+## its home position and roams there instead of pacing a wall.
 ##
 ## Wall walking (spiders & friends): the body's up axis follows the surface
 ## normal, gravity pulls into the wall, feet plant via the animator's
@@ -27,6 +31,9 @@ extends CharacterBody3D
 ## override grip and throw the walker off the wall.
 
 enum State { CHASE, PATH, JUMPING, CLIMBING, LAUNCHED, RECOVER, RETURN_HOME, ROAM }
+## What the active/pending path is FOR — home/roam paths must not be
+## retargeted at the player, and chase paths must not lead home.
+enum PathPurpose { CHASE, HOME, ROAM }
 
 const TARGET_GROUP := "nav_target"  ## Players AND companions register here.
 
@@ -93,12 +100,21 @@ var _profile: NavAgentProfile
 var _path: Array = []
 var _path_i: int = 0
 var _path_from_trail: bool = false          ## Current path replays the target's trail.
+var _path_purpose: int = PathPurpose.CHASE  ## What the current path is for.
 var _path_pending: bool = false             ## An async graph query is in flight.
+var _pending_purpose: int = PathPurpose.CHASE
+var _pending_goal: Vector3 = Vector3.INF    ## Goal of the in-flight query.
 var _path_gen: int = 0                      ## Request serial; stale results are dropped.
 var _pending_timeout: float = 0.0
 
 const PATH_REQUEST_TIMEOUT := 3.0           ## Give up waiting on a query after this.
-const MAX_PATHFINDERS := 8                  ## Only this many enemies may query the graph at once.
+## Fair pathfinding: a small per-physics-frame budget of query STARTS shared
+## by the whole population. Combined with each enemy's randomized repath
+## cooldown this gives everyone a turn instead of starving 7/8 of the herd
+## (the old instance_id % 8 wave slot did exactly that).
+const PATH_STARTS_PER_FRAME := 3
+static var _starts_frame: int = -1
+static var _starts_used: int = 0
 var _repath_timer: float = 0.0
 var _path_goal: Vector3 = Vector3.INF
 var _stuck_timer: float = 0.0
@@ -129,7 +145,8 @@ var _roam_goal: Vector3 = Vector3.ZERO
 var _roam_timer: float = 0.0
 var _launched_time: float = 0.0
 var _jump_fail_streak: int = 0
-var _path_goal_override: Vector3 = Vector3.INF
+var _graph_fail_streak: int = 0             ## Consecutive empty chase-path results.
+var _graph_fail_time: float = 0.0           ## When the last empty result landed.
 
 
 func _ready() -> void:
@@ -290,12 +307,21 @@ func _update_crowded() -> bool:
 	return _crowded
 
 
+## Fair per-frame budget of query starts: first-come-first-served each
+## physics frame; the randomized per-enemy repath cooldowns rotate who asks
+## first, so nobody is permanently starved into trail-following. Claims the
+## slot immediately so no two callers can share one.
 func _may_pathfind() -> bool:
-	if _graph == null or _target == null:
+	if _graph == null:
 		return false
-	# Rotate which enemies may query — no O(n) group scan every repath.
-	var wave := int(Time.get_ticks_msec() / 600) % MAX_PATHFINDERS
-	return (get_instance_id() % MAX_PATHFINDERS) == wave
+	var f := Engine.get_physics_frames()
+	if f != _starts_frame:
+		_starts_frame = f
+		_starts_used = 0
+	if _starts_used >= PATH_STARTS_PER_FRAME:
+		return false
+	_starts_used += 1
+	return true
 
 
 # --- Territory / home --------------------------------------------------------
@@ -303,18 +329,22 @@ func _may_pathfind() -> bool:
 func _update_territory_brain(_delta: float) -> void:
 	if _state in [State.LAUNCHED, State.JUMPING, State.CLIMBING, State.RECOVER]:
 		return
+	var homing := _state == State.RETURN_HOME or _state == State.ROAM \
+			or (_state == State.PATH and _path_purpose != PathPurpose.CHASE)
 	if _target == null:
-		if _state != State.ROAM:
+		if not homing:
 			_enter_roam()
 		return
 
 	var dist := global_position.distance_to(_target.global_position)
-	if _state == State.RETURN_HOME or _state == State.ROAM:
-		if dist < chase_range * 0.9:
+	if homing:
+		# Hysteresis: re-engage only when clearly back inside reach, so the
+		# enemy cannot oscillate between "go home" and "chase" every frame.
+		if dist < minf(chase_range, return_distance) * 0.7:
+			_clear_path()
 			_state = State.CHASE
 			_home_return_attempts = 0
-			_path_goal_override = Vector3.INF
-			_clear_path()
+			_graph_fail_streak = 0
 		return
 
 	if dist > return_distance:
@@ -325,6 +355,9 @@ func _update_territory_brain(_delta: float) -> void:
 		_on_route_failed()
 
 
+## A route attempt definitively failed. Near the target that just means
+## "drop it and re-chase"; far away it means "give up and go home". After
+## too many failures in a row the enemy adopts its current spot as home.
 func _on_route_failed() -> void:
 	_clear_path()
 	_home_return_attempts += 1
@@ -333,19 +366,22 @@ func _on_route_failed() -> void:
 		_roam_goal = home_position
 		_home_return_attempts = 0
 		_enter_roam()
+		return
+	var near_target := _target != null \
+			and global_position.distance_to(_target.global_position) < minf(chase_range, return_distance) * 0.7
+	if near_target:
+		_state = State.CHASE
 	else:
 		_enter_return_home()
 
 
 func _enter_return_home() -> void:
 	_clear_path()
-	_path_goal_override = home_position
 	_state = State.RETURN_HOME
 
 
 func _enter_roam() -> void:
 	_clear_path()
-	_path_goal_override = Vector3.INF
 	_state = State.ROAM
 	_pick_roam_goal()
 	_roam_timer = roam_goal_interval * randf_range(0.4, 1.0)
@@ -357,20 +393,38 @@ func _pick_roam_goal() -> void:
 	_roam_goal = home_position + Vector3(cos(ang) * r, 0.0, sin(ang) * r)
 
 
+## Pre-adoption gate: the recorded trail only leads to the target while the
+## target is still near its own trail tip.
+func _trail_usable() -> bool:
+	if not use_trail_following or _target == null:
+		return false
+	var rec := NavPathRecorder.find_for(_target)
+	if rec == null or rec.size() < 2:
+		return false
+	return rec.latest().distance_to(_target.global_position) <= 6.0
+
+
+## While replaying a trail: has the target left the route this path leads to?
+## Checks the target against where the path is HEADED (its goal), not just
+## the trail tip, and drops the trail the moment direct pursuit works again.
 func _should_abandon_trail() -> bool:
 	if not use_trail_following or _target == null:
 		return true
 	var rec := NavPathRecorder.find_for(_target)
 	if rec == null or rec.size() < 2:
 		return true
-	if rec.latest().distance_to(_target.global_position) > 6.0:
+	var t := _target.global_position
+	if rec.latest().distance_to(t) > 6.0:
 		return true
-	var trail_flat := Vector2(rec.latest().x, rec.latest().z)
-	var player_flat := Vector2(_target.global_position.x, _target.global_position.z)
-	if player_flat.distance_to(trail_flat) > abandon_trail_flat:
-		return true
-	if absf(_target.global_position.y - rec.latest().y) > abandon_trail_height:
-		return true
+	if _path_goal != Vector3.INF:
+		if Vector2(_path_goal.x - t.x, _path_goal.z - t.z).length() > abandon_trail_flat:
+			return true
+		if absf(_path_goal.y - t.y) > abandon_trail_height:
+			return true
+	if _route_check_cd <= 0.0:
+		_route_check_cd = 0.25
+		if _direct_route_viable(t - global_position):
+			return true
 	return false
 
 
@@ -596,7 +650,9 @@ func _is_blocked_ahead(dir: Vector3) -> bool:
 		return false
 	var space := get_world_3d().direct_space_state
 	var r := animator.plan.collider_radius
-	var shin_from := global_position + Vector3.UP * 0.18
+	# Probe just above step height: anything lower is hoppable by _try_step_up
+	# and must not force a smart route.
+	var shin_from := global_position + Vector3.UP * (max_step_height + 0.15)
 	var q := PhysicsRayQueryParameters3D.create(shin_from, shin_from + dir.normalized() * (r + 0.7))
 	q.collision_mask = SURFACE_MASK
 	var hit := space.intersect_ray(q)
@@ -607,13 +663,16 @@ func _is_blocked_ahead(dir: Vector3) -> bool:
 
 
 func _direct_route_viable(to_target: Vector3) -> bool:
-	if absf(to_target.y) > max_step_height + 0.35:
+	if to_target.y > max_step_height + 0.35:
 		return false
-	var flat_dir := Vector3(to_target.x, 0.0, to_target.z) - Vector3(global_position.x, 0.0, global_position.z)
+	if to_target.y < -(max_drop + 0.5):
+		return false
+	var flat_dir := Vector3(to_target.x, 0.0, to_target.z)
 	if flat_dir.length_squared() < 0.04:
 		return absf(to_target.y) <= max_step_height + 0.35
 	flat_dir = flat_dir.normalized()
-	if _void_ahead(flat_dir, max_step_height + 0.5):
+	var allowed_drop := max_drop if to_target.y < -1.5 else maxf(max_step_height + 0.5, 1.2)
+	if _void_ahead(flat_dir, allowed_drop):
 		return false
 	if _is_blocked_ahead(flat_dir):
 		return false
@@ -630,12 +689,16 @@ func _refresh_route_cache(to_target: Vector3, flat_dir: Vector3) -> void:
 	_cached_blocked = flat_dir.length_squared() > 0.001 and _is_blocked_ahead(flat_dir)
 
 
+## Escalate to path/probe logic ONLY when direct pursuit genuinely cannot
+## work: a rise above step height, a drop beyond safety, real lack of
+## progress, or a cached "direct route not viable" verdict. Small height
+## deltas stay in plain chase — flat-ground pursuit must never pathfind.
 func _needs_smart_route(to_target: Vector3) -> bool:
 	if to_target.y > max_step_height + 0.25:
 		return true
-	if _stuck_timer > 0.45 or _progress_timer > 0.45:
+	if to_target.y < -(max_drop + 0.5):
 		return true
-	if _target != null and absf(to_target.y) > 0.75:
+	if _stuck_timer > 0.8 or _progress_timer > 0.9:
 		return true
 	return _cached_needs_path
 
@@ -799,27 +862,40 @@ func _process_chase(delta: float) -> void:
 		return
 
 	if _needs_smart_route(to_target):
+		# PRIMARY: graph path to the target's current ground position.
 		_try_request_path()
-		if _path.is_empty() and not _path_pending and use_trail_following and not _should_abandon_trail():
-			_try_follow_trail()
-		if _state == State.PATH:
+		# LAST RESORT: validated trail replay, only after the graph has
+		# repeatedly confirmed it cannot reach (see _try_follow_trail).
+		if _try_follow_trail():
 			_finish_move(delta)
 			return
 		if _try_reactive_ascent(flat_dir):
 			_finish_move(delta)
 			return
-		if not _path_pending:
-			_face_toward(flat_dir)
-			if _is_blocked_cached(flat_dir):
-				for side in [-1.0, 1.0]:
-					var flank := flat_dir.rotated(Vector3.UP, deg_to_rad(55.0 * side))
-					if not _is_blocked_cached(flank):
-						_steer_move(global_position + flank * 2.0, delta, 0.85)
-						_finish_move(delta)
-						return
-			_idle_move(delta)
+		# Confirmed unreachable and beyond this body's vertical reach ->
+		# stop pacing the wall, go home.
+		if _graph_fail_streak >= 3 and to_target.y > _max_reach_up() + 0.5:
+			_on_route_failed()
 			_finish_move(delta)
 			return
+		# Keep closing in while the graph thinks (or between retries).
+		_face_toward(flat_dir)
+		if _is_blocked_cached(flat_dir):
+			for side in [-1.0, 1.0]:
+				var flank := flat_dir.rotated(Vector3.UP, deg_to_rad(55.0 * side))
+				if not _is_blocked_ahead(flank):
+					_steer_move(global_position + flank * 2.0, delta, 0.85)
+					_finish_move(delta)
+					return
+			# Boxed in: keep the stuck clock running so probes still fire.
+			_stuck_timer = minf(_stuck_timer + delta, 2.0)
+			_idle_move(delta)
+		elif is_on_floor() and flat_dir.length_squared() > 0.01 and _void_ahead(flat_dir, max_step_height + 0.5):
+			_idle_move(delta)
+		else:
+			_steer_move(chase_pt, delta, 0.9)
+		_finish_move(delta)
+		return
 
 	if can_wall_walk and _target.global_position.y > global_position.y + 1.2 and _try_attach_wall():
 		_finish_move(delta)
@@ -842,15 +918,17 @@ func _process_chase(delta: float) -> void:
 
 
 func _process_return_home(delta: float) -> void:
-	_path_goal_override = home_position
 	var to_home := home_position - global_position
 	if Vector2(to_home.x, to_home.z).length() < 1.2 and absf(to_home.y) < 2.0:
 		_enter_roam()
 		_finish_move(delta)
 		return
+	# Prefer a real graph route home; steer directly while it is pending.
+	_try_request_path()
 	_face_toward(to_home)
-	if _graph != null and _graph.is_ready() and _repath_timer <= 0.0:
-		_try_request_path()
+	if _stuck_timer > 0.6 and _try_reactive_ascent(Vector3(to_home.x, 0.0, to_home.z)):
+		_finish_move(delta)
+		return
 	_steer_move(home_position, delta, 0.9)
 	_finish_move(delta)
 
@@ -863,6 +941,14 @@ func _process_roam(delta: float) -> void:
 	if Vector2(to_goal.x, to_goal.z).length() < 1.0:
 		_idle_move(delta)
 	else:
+		# Pathfind to far roam goals so obstacles are walked around, not into.
+		if Vector2(to_goal.x, to_goal.z).length() > 3.0:
+			_try_request_path()
+		if _progress_timer > 1.0:
+			# Blocked wander goal — just pick another one.
+			_pick_roam_goal()
+			_progress_timer = 0.0
+			_stuck_timer = 0.0
 		_face_toward(to_goal)
 		_steer_move(_roam_goal, delta, 0.55)
 	_finish_move(delta)
@@ -879,29 +965,41 @@ func _process_wall_chase(delta: float) -> void:
 
 
 func _process_path(delta: float) -> void:
-	if _target == null or _path.is_empty() or _path_i >= _path.size():
+	if _path.is_empty() or _path_i >= _path.size():
+		_clear_path()
+		_finish_move(delta)
+		return
+	if _path_purpose == PathPurpose.CHASE and _target == null:
 		_clear_path()
 		_finish_move(delta)
 		return
 
-	# Close enough for direct pursuit — but not if we still need a vertical route.
-	var to_target := _target.global_position - global_position
-	if Vector2(to_target.x, to_target.z).length() < 5.0 and absf(to_target.y) < 1.4:
-		if not _needs_smart_route(to_target):
-			_clear_path()
-			_finish_move(delta)
-			return
+	if _path_purpose == PathPurpose.CHASE:
+		# Close enough for direct pursuit — but not if we still need a vertical route.
+		var to_target := _target.global_position - global_position
+		if Vector2(to_target.x, to_target.z).length() < 5.0 and absf(to_target.y) < 1.4:
+			if not _needs_smart_route(to_target):
+				_clear_path()
+				_finish_move(delta)
+				return
 
-	# Abandon stale trail paths when the player left the route.
-	if _path_from_trail and _should_abandon_trail():
-		_on_route_failed()
-		_finish_move(delta)
-		return
+		if _path_from_trail:
+			# Abandon stale trail paths when the player left the route.
+			if _should_abandon_trail():
+				_on_route_failed()
+				_finish_move(delta)
+				return
+			# Keep asking the graph so a real route replaces the replay ASAP.
+			_try_request_path()
+		elif _repath_timer <= 0.0 and _path_goal.distance_to(_target.global_position) > 4.0:
+			# Target drifted away from this path's goal -> repath on cadence
+			# (async; the current path is followed until the new one lands).
+			_try_request_path()
 
-	# Target drifted away from this path's goal -> repath on cadence (async;
-	# the current path keeps being followed until the new one lands).
-	if _repath_timer <= 0.0 and _path_goal.distance_to(_target.global_position) > 4.0:
-		_try_request_path()
+	var wp: Dictionary = _path[_path_i]
+	var wp_pos: Vector3 = wp["pos"]
+	var move: int = wp["move"]
+	var to_wp := wp_pos - global_position
 
 	if _stuck_timer > 0.75:
 		_stuck_timer = 0.0
@@ -910,17 +1008,15 @@ func _process_path(delta: float) -> void:
 			_on_route_failed()
 			_finish_move(delta)
 			return
-		if _try_reactive_ascent(Vector3(_target.global_position.x - global_position.x, 0.0, _target.global_position.z - global_position.z)):
+		if _try_reactive_ascent(Vector3(to_wp.x, 0.0, to_wp.z)):
 			_finish_move(delta)
 			return
 		_clear_path()
 		_finish_move(delta)
 		return
 
-	var wp: Dictionary = _path[_path_i]
-	var wp_pos: Vector3 = wp["pos"]
-	var move: int = wp["move"]
-	var to_wp := wp_pos - global_position
+	# Home/roam paths walk a touch slower than a hot pursuit.
+	var pace := 1.0 if _path_purpose == PathPurpose.CHASE else 0.8
 
 	# Anticipated takeoff: when the NEXT waypoint is a jump, launch as soon
 	# as this lip waypoint is close instead of overshooting it at full speed
@@ -972,7 +1068,7 @@ func _process_path(delta: float) -> void:
 				_steer_move(wp_pos, delta)
 		_:
 			# Slow down on the approach to a takeoff lip for a clean jump.
-			var spd := 1.0
+			var spd := pace
 			if _path_i + 1 < _path.size() and int((_path[_path_i + 1] as Dictionary)["move"]) == NavGraph.Edge.JUMP:
 				if Vector2(to_wp.x, to_wp.z).length() < 3.0:
 					spd = 0.75
@@ -1016,7 +1112,7 @@ func _process_jumping(delta: float) -> void:
 			return
 		_jump_fail_streak = 0
 		animator.replant_feet()
-		_state = State.PATH if not _path.is_empty() else State.CHASE
+		_state = State.PATH if not _path.is_empty() else _state_after_path()
 		if not _path.is_empty() and _path_i < _path.size():
 			var wp: Dictionary = _path[_path_i]
 			if global_position.distance_to(wp["pos"]) < 1.8:
@@ -1064,7 +1160,7 @@ func _process_climbing(delta: float) -> void:
 	animator.set_look_target(_target)
 	if _climb_p >= 1.0:
 		animator.clear_hand_overrides()
-		_state = State.PATH if not _path.is_empty() else State.CHASE
+		_state = State.PATH if not _path.is_empty() else _state_after_path()
 		if not _path.is_empty() and _path_i < _path.size():
 			var wp: Dictionary = _path[_path_i]
 			if global_position.distance_to(wp["pos"]) < 1.5:
@@ -1135,34 +1231,65 @@ func _process_recover(delta: float) -> void:
 
 # --- Pathing -----------------------------------------------------------------
 
-## Queues an async NavGraph query toward the current target. The worker
-## thread solves it off-frame; _on_path_result adopts it when it lands.
-## Returns true when a request was actually queued.
+## Queues an async NavGraph query for the current purpose (chase goal = the
+## target's ground position plus a small velocity lead; home/roam goals are
+## fixed points). The worker thread solves it off-frame; _on_path_result
+## adopts it when it lands. Returns true when a request was actually queued.
 func _try_request_path() -> bool:
 	if _graph == null or _path_pending or _crowded:
 		return false
-	if _state != State.RETURN_HOME and _target == null:
-		return false
-	if not _may_pathfind():
+	var purpose := _current_purpose()
+	if purpose == PathPurpose.CHASE and _target == null:
 		return false
 	if _repath_timer > 0.0 or not _graph.can_query():
 		return false
+	if not _may_pathfind():
+		return false
 	_repath_timer = 0.75 + randf() * 0.45
 	_path_gen += 1
-	var goal := _path_goal_override if _path_goal_override != Vector3.INF else (_target.global_position if _target else global_position)
-	if _path_goal_override == Vector3.INF and _target is CharacterBody3D:
-		var tv := (_target as CharacterBody3D).velocity
-		goal += Vector3(tv.x, 0.0, tv.z) * 0.4
+	var goal := global_position
+	match purpose:
+		PathPurpose.HOME:
+			goal = home_position
+		PathPurpose.ROAM:
+			goal = _roam_goal
+		_:
+			goal = _get_chase_point()
+			if _target is CharacterBody3D:
+				var tv := (_target as CharacterBody3D).velocity
+				goal += Vector3(tv.x, 0.0, tv.z) * 0.4
 	if _graph.request_path(global_position, goal, _profile,
 			_on_path_result.bind(_path_gen)):
 		_path_pending = true
+		_pending_purpose = purpose
+		_pending_goal = goal
 		_pending_timeout = PATH_REQUEST_TIMEOUT
 		return true
 	return false
 
 
-## Main-thread delivery of a solved path. Empty result = the graph cannot
-## reach the target -> fall back to replaying the target's recorded trail.
+func _current_purpose() -> int:
+	if _state == State.RETURN_HOME:
+		return PathPurpose.HOME
+	if _state == State.ROAM:
+		return PathPurpose.ROAM
+	if _state == State.PATH:
+		return _path_purpose
+	return PathPurpose.CHASE
+
+
+func _state_after_path() -> int:
+	match _path_purpose:
+		PathPurpose.HOME:
+			return State.RETURN_HOME
+		PathPurpose.ROAM:
+			return State.ROAM
+	return State.CHASE
+
+
+## Main-thread delivery of a solved path. An empty CHASE result feeds the
+## failure streak that eventually unlocks the trail fallback / going home —
+## it does NOT trigger trail replay by itself.
 func _on_path_result(path: Array, gen: int) -> void:
 	if gen != _path_gen:
 		return  # Superseded or timed-out request; a fresher one is in charge.
@@ -1170,17 +1297,31 @@ func _on_path_result(path: Array, gen: int) -> void:
 	if _state == State.LAUNCHED or _state == State.RECOVER \
 			or _state == State.JUMPING or _state == State.CLIMBING or _on_wall_surface():
 		return
+	if _pending_purpose != _current_purpose():
+		return  # State changed while the worker was solving; result is moot.
 	if path.is_empty():
-		_try_follow_trail()
+		match _pending_purpose:
+			PathPurpose.CHASE:
+				var now := Time.get_ticks_msec() / 1000.0
+				_graph_fail_streak = 1 if now - _graph_fail_time > 6.0 else _graph_fail_streak + 1
+				_graph_fail_time = now
+			PathPurpose.HOME:
+				_on_route_failed()
+			_:
+				pass  # Roam just keeps steering; a new goal comes soon anyway.
 		return
-	_adopt_path(path, false)
+	if _pending_purpose == PathPurpose.CHASE:
+		_graph_fail_streak = 0
+		_home_return_attempts = 0
+	_adopt_path(path, false, _pending_goal, _pending_purpose)
 
 
-func _adopt_path(path: Array, from_trail: bool) -> void:
+func _adopt_path(path: Array, from_trail: bool, goal: Vector3, purpose: int) -> void:
 	_path = path
 	_path_i = 0
 	_path_from_trail = from_trail
-	_path_goal = _target.global_position if _target != null else Vector3.INF
+	_path_purpose = purpose
+	_path_goal = goal
 	_state = State.PATH
 	if _graph != null:
 		var pts := PackedVector3Array()
@@ -1190,22 +1331,30 @@ func _adopt_path(path: Array, from_trail: bool) -> void:
 		_graph.set_debug_path(get_instance_id(), pts)
 
 
-## Third routing option: replay the target's own breadcrumb trail. Used when
-## the graph has no route (e.g. floating platforms the target jumped across)
-## but the target's recorded line still ends near them and passes near this
-## enemy. Each trail segment is classified against THIS body's abilities —
-## jumps for parkour bodies, ledge climbs for bodies with hands, wall links
-## for wall walkers — so every AI type gets its own valid interpretation.
+## LAST-RESORT routing: replay the target's own breadcrumb trail. Only used
+## once the graph has repeatedly confirmed it cannot reach the target (a
+## trail encodes player-only affordances — vaults, sprint arcs, grabbable
+## ledges — so it is never trusted before the graph). Every segment is
+## classified against THIS body's abilities and the validated line must
+## still END near the target; a truncated or stale line is rejected instead
+## of blindly adopted.
 func _try_follow_trail() -> bool:
-	if not use_trail_following or _target == null or _should_abandon_trail():
+	if not use_trail_following or _target == null:
+		return false
+	if _graph != null:
+		if not _graph.is_ready() or _path_pending:
+			return false   # The graph has not had its say yet.
+		if _graph_fail_streak < 2:
+			return false   # Not confirmed unreachable — keep asking the graph.
+	if not _trail_usable():
 		return false
 	var rec := NavPathRecorder.find_for(_target)
 	if rec == null or rec.size() < 2:
 		return false
-	var join_dy := clampf(absf(_target.global_position.y - global_position.y) + 2.5, 4.0, 18.0)
-	var join := rec.nearest_index(global_position, 12.0, join_dy)
+	var join := rec.nearest_index(global_position, 8.0, _trail_join_dy())
 	if join < 0:
 		return false
+	var t := _target.global_position
 	# The entry segment (enemy -> join crumb) must be traversable too; back
 	# up the trail a few crumbs to find one this body can actually reach.
 	for back in 4:
@@ -1213,10 +1362,42 @@ func _try_follow_trail() -> bool:
 		if j < 0:
 			break
 		var wps := _trail_to_waypoints(rec, j)
-		if not wps.is_empty():
-			_adopt_path(wps, true)
-			return true
+		if wps.is_empty():
+			continue
+		# Reject truncated lines that stop short of the target — a replay
+		# that cannot arrive is worse than going home.
+		var last: Vector3 = (wps[wps.size() - 1] as Dictionary)["pos"]
+		if Vector2(last.x - t.x, last.z - t.z).length() > 4.0:
+			continue
+		if absf(last.y - t.y) > 2.5:
+			continue
+		_adopt_path(wps, true, rec.latest(), PathPurpose.CHASE)
+		return true
 	return false
+
+
+## How far above/below a trail crumb this body could join it, from abilities.
+func _trail_join_dy() -> float:
+	var dy := max_step_height + 1.5
+	if _profile.can_jump:
+		dy = maxf(dy, jump_apex + 1.0)
+	if _profile.can_parkour:
+		dy = maxf(dy, _profile.climb_height + 1.0)
+	if can_wall_walk:
+		dy = maxf(dy, 10.0)
+	return dy
+
+
+## Tallest rise this body can beat with any of its moves.
+func _max_reach_up() -> float:
+	var reach := max_step_height
+	if _profile.can_jump:
+		reach = maxf(reach, jump_apex)
+	if _profile.can_parkour:
+		reach = maxf(reach, _profile.climb_height)
+	if can_wall_walk:
+		reach = maxf(reach, 15.0)
+	return reach
 
 
 ## Converts the trail from crumb `join` onward into typed waypoints this body
@@ -1276,7 +1457,8 @@ func _clear_path() -> void:
 	_path_i = 0
 	_path_from_trail = false
 	if _state == State.PATH:
-		_state = State.CHASE
+		_state = _state_after_path()
+	_path_purpose = PathPurpose.CHASE
 	if _graph != null:
 		_graph.set_debug_path(get_instance_id(), PackedVector3Array())
 

@@ -29,7 +29,9 @@ signal build_finished
 enum Edge { WALK, STEP, DROP, JUMP, CLIMB, WALL }
 enum BuildPhase { IDLE, SAMPLE, LINK, JUMPS, DONE }
 
-const CELL := 3.0                   ## Horizontal sampling resolution (m).
+const CELL := 2.0                   ## Horizontal sampling resolution (m).
+                                    ## 3.0 missed narrow stairs/step geometry;
+                                    ## 2.0 restores precision, build stays budgeted.
 const SURFACE_MASK := 32            ## Physics layer 6: static nav surfaces only.
 const MIN_HEADROOM := 0.72          ## Smallest crawl space worth a node.
 const MAX_HEADROOM := 6.0
@@ -43,10 +45,10 @@ const JUMP_DY_UP := 2.2
 const JUMP_DY_DOWN := 4.0
 const MAX_MARCH_HITS := 8           ## Surface levels per column (tunnels etc).
 
-const BUILD_BUDGET_US := 3500         ## Max microseconds of nav baking per frame (~3.5 ms).
-const ASTAR_MAX_EXPANSIONS := 3500
-const MAX_PENDING := 8              ## Max queued async path requests.
-const MAX_DELIVER_PER_FRAME := 2      ## Main-thread callbacks per frame (never hitch).
+const BUILD_BUDGET_US := 5000         ## Max microseconds of nav baking per frame (~5 ms).
+const ASTAR_MAX_EXPANSIONS := 8000    ## Worker-thread only — never blocks a frame.
+const MAX_PENDING := 16             ## Max queued async path requests.
+const MAX_DELIVER_PER_FRAME := 4      ## Main-thread callbacks per frame (never hitch).
 const MAX_PENDING_DELIVERIES := 16    ## Drop stale results beyond this (prevents memory growth).
 const HEURISTIC_WEIGHT := 1.12      ## Slightly greedy A* = far fewer expansions.
 
@@ -223,15 +225,45 @@ func _worker_loop() -> void:
 		var req: Dictionary = _requests.pop_front()
 		_queue_mutex.unlock()
 
-		var path := _solve(req["from"], req["to"], req["prof"])
+		var path := _simplify(_solve(req["from"], req["to"], req["prof"]))
 		_results_mutex.lock()
 		_results.push_back({"callback": req["callback"], "path": path})
 		_results_mutex.unlock()
 
 
+## Thread-safe waypoint thinning for the worker: drops WALK waypoints that
+## barely deviate from the straight line between their neighbors on level
+## ground. Pure geometry — no raycasts — so it is safe off the main thread,
+## unlike _smooth(). Removes the grid zigzag that made delivered paths jagged.
+func _simplify(path: Array) -> Array:
+	if path.size() < 3:
+		return path
+	var out: Array = [path[0]]
+	var anchor: Vector3 = (path[0] as Dictionary)["pos"]
+	var idx := 1
+	while idx < path.size() - 1:
+		var step: Dictionary = path[idx]
+		var nxt: Dictionary = path[idx + 1]
+		if int(step["move"]) == Edge.WALK and int(nxt["move"]) == Edge.WALK:
+			var p: Vector3 = step["pos"]
+			var b: Vector3 = nxt["pos"]
+			if absf(b.y - anchor.y) < 0.5 and absf(p.y - anchor.y) < 0.4:
+				var ab := Vector2(b.x - anchor.x, b.z - anchor.z)
+				var ap := Vector2(p.x - anchor.x, p.z - anchor.z)
+				var t := clampf(ap.dot(ab) / maxf(ab.length_squared(), 0.001), 0.0, 1.0)
+				if (ap - ab * t).length() < CELL * 0.35:
+					idx += 1
+					continue
+		out.append(step)
+		anchor = step["pos"]
+		idx += 1
+	out.append(path[path.size() - 1])
+	return out
+
+
 ## Main thread: hand finished paths back to their requesters. A strict per-frame
 ## budget prevents a crowd of enemies from hitching the game when paths land.
-## Smoothing is skipped here — it raycasts and is not safe off the worker thread.
+## Raycast smoothing stays off this path — the worker already ran _simplify().
 func _deliver_results() -> void:
 	_results_mutex.lock()
 	if not _results.is_empty():
