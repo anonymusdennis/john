@@ -7,6 +7,7 @@ const PhysicsObject = preload("res://scripts/physics_object.gd")
 const EnemyScene = preload("res://scenes/enemy.tscn")
 
 @export var seed_value: int = 42
+@export var enemy_count: int = 12
 
 
 func _ready() -> void:
@@ -351,14 +352,33 @@ func _spawn_enemies() -> void:
 	var root := Node3D.new()
 	root.name = "Enemies"
 	add_child(root)
-	var spawns := [
-		{"form": "human", "pos": Vector3(8, 0.1, -6)},
+	var forms := ["human", "imp", "centaur", "spider", "centipede"]
+	var spawns: Array[Dictionary] = [
+		# Near player start — you should see these right away.
+		{"form": "human", "pos": Vector3(5, 0.1, 8)},
+		{"form": "imp", "pos": Vector3(-4, 0.1, 11)},
+		{"form": "spider", "pos": Vector3(2, 0.1, 14)},
+		# Around the playground.
+		{"form": "centaur", "pos": Vector3(8, 0.1, -6)},
 		{"form": "imp", "pos": Vector3(-8, 0.1, -18)},
 		{"form": "centaur", "pos": Vector3(14, 0.1, 4)},
 		{"form": "spider", "pos": Vector3(-6, 0.1, 14)},
 		{"form": "centipede", "pos": Vector3(0, 0.1, -16)},
+		{"form": "human", "pos": Vector3(18, 0.1, 8)},
+		{"form": "centipede", "pos": Vector3(-18, 0.1, 6)},
+		{"form": "imp", "pos": Vector3(22, 0.1, -4)},
+		{"form": "spider", "pos": Vector3(-12, 0.1, -10)},
 	]
-	for s in spawns:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed_value + 9001
+	while spawns.size() < enemy_count:
+		var ang := rng.randf() * TAU
+		var r := rng.randf_range(14.0, 38.0)
+		spawns.append({
+			"form": forms[rng.randi_range(0, forms.size() - 1)],
+			"pos": Vector3(cos(ang) * r, 0.1, sin(ang) * r),
+		})
+	for s in spawns.slice(0, enemy_count):
 		var enemy := EnemyScene.instantiate()
 		enemy.body_form = s["form"]
 		root.add_child(enemy)
