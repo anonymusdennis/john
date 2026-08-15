@@ -51,8 +51,23 @@ built asynchronously at startup from all static geometry:
   ledge climbs), spiders walk straight up walls, centaurs stay ground-bound.
 - **Reactive step-up sensors** handle tiny ledges (≤0.6 m) instantly, even
   off-graph — small obstacles never stall a chase.
-- A\* queries are budgeted per frame and repaths are staggered; distant
-  enemies sleep (animation + AI LOD).
+- **Threaded queries**: A\* runs on a dedicated worker thread (stamped-array
+  search, no per-query allocation). Enemies request routes asynchronously and
+  keep steering until the result lands — pathfinding can never hitch a frame.
+- **Anticipated takeoffs**: enemies brake on the approach to a jump lip and
+  launch *before* momentum carries them off the ledge; infeasible jumps
+  (too high / too far, e.g. after a missed takeoff) are refused and repathed
+  instead of executed as physics-defying mega-jumps. A void-ahead probe stops
+  direct chases from blindly running off cliffs.
+- **Breadcrumb trail fallback**: every nav target carries a `NavPathRecorder`
+  that logs its grounded path (generous ~600 m ring buffer). When the graph
+  cannot reach a target (floating platforms!), enemies replay the target's own
+  proven line, re-classifying each segment against their abilities — parkour
+  bodies jump and ledge-climb, wall walkers take the faces.
+- **Multi-target**: enemies hunt the nearest member of the `nav_target` group
+  (any player or companion — multiplayer ready), with sticky retargeting and
+  per-target trails.
+- Repaths are staggered and distant enemies sleep (animation + AI LOD).
 
 Press **F4** to see the graph and every enemy's current path.
 
@@ -125,8 +140,10 @@ scripts/rotating_platform.gd  Windmill sails / carousel
 scripts/kegel_king.gd       Golden pin → grenade shower
 scripts/enemy.gd            Enemy brain (chase / path / jump / climb /
                             wall-walk / launched states, grip + knockback)
-scripts/nav/nav_graph.gd          Surface graph: sampling, typed edges, A*
+scripts/nav/nav_graph.gd          Surface graph: sampling, typed edges,
+                                  threaded A* queries
 scripts/nav/nav_agent_profile.gd  Per-agent size + capability profile
+scripts/nav/path_recorder.gd      Per-target breadcrumb trail (route template)
 scripts/nav/nav_debug_draw.gd     F4 visualization
 scripts/anim/proc_body_plan.gd     Body form definitions (5 presets)
 scripts/anim/proc_body_builder.gd  Runtime skeleton + visuals generator

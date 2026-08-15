@@ -475,7 +475,7 @@ func _process_path(delta: float) -> void:
 				return
 			# Missed the takeoff and now falling: abort before the fall turns
 			# into an impossible ground-to-rooftop mega jump from below.
-			if velocity.y < -2.5 or global_position.y < wp_pos.y - max_drop - 1.0:
+			if velocity.y < -3.0 or global_position.y < wp_pos.y - max_drop - 1.0:
 				_clear_path()
 				_finish_move(delta)
 				return
