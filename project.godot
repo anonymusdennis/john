@@ -159,6 +159,7 @@ hotbar_9={
 3d_physics/layer_1="world"
 3d_physics/layer_2="player"
 3d_physics/layer_3="grabbable"
+3d_physics/layer_6="nav_surface"
 
 [physics]
 

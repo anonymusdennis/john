@@ -5,6 +5,7 @@ const WorldPickup = preload("res://scripts/world_pickup.gd")
 const GrabbableLedge = preload("res://scripts/grabbable_ledge.gd")
 const PhysicsObject = preload("res://scripts/physics_object.gd")
 const EnemyScene = preload("res://scenes/enemy.tscn")
+const NavGraphScene = preload("res://scripts/nav/nav_graph.gd")
 
 @export var seed_value: int = 42
 @export var enemy_count: int = 12
@@ -22,6 +23,17 @@ func _ready() -> void:
 	_build_kegel_set(Vector3(-12, 0, -10))
 	_build_ramps_and_decor()
 	_spawn_enemies()
+	_start_nav_graph()
+
+
+## The smart navigation system: samples every static surface (layer 6) into
+## a typed graph. Runs asynchronously; enemies fall back to direct chase
+## until the build finishes.
+func _start_nav_graph() -> void:
+	var graph := NavGraphScene.new()
+	graph.name = "NavGraph"
+	add_child(graph)
+	graph.configure(AABB(Vector3(-62, -8, -62), Vector3(124, 52, 124)))
 
 
 func _mat(color: Color, rough: float = 0.8, metal: float = 0.0) -> StandardMaterial3D:
@@ -35,7 +47,8 @@ func _mat(color: Color, rough: float = 0.8, metal: float = 0.0) -> StandardMater
 func _static_box(parent: Node, pos: Vector3, size: Vector3, mat: Material, grabbable: bool = false) -> StaticBody3D:
 	var body := StaticBody3D.new()
 	body.position = pos
-	body.collision_layer = 5 if grabbable else 1
+	# Bit 32 (layer 6) marks static geometry that the NavGraph samples.
+	body.collision_layer = (5 if grabbable else 1) | 32
 	body.collision_mask = 0
 	if grabbable:
 		body.set_script(GrabbableLedge)
@@ -325,7 +338,7 @@ func _build_ramps_and_decor() -> void:
 	var ramp := StaticBody3D.new()
 	ramp.position = Vector3(-12, 0.8, 6)
 	ramp.rotation_degrees = Vector3(0, 0, -18)
-	ramp.collision_layer = 1
+	ramp.collision_layer = 1 | 32
 	var mesh_i := MeshInstance3D.new()
 	var box := BoxMesh.new()
 	box.size = Vector3(8, 0.4, 4)
