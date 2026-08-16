@@ -1,0 +1,23 @@
+{
+  "source": "https://github.com/Builderb0y/BigGlobe",
+  "branch": "scriptable-generators",
+  "status": "not_fetched",
+  "note": "Run ../scripts/fetch_big_globe_refs.sh from repo root to populate this directory.",
+  "expected_files_after_fetch": [
+    "List of features.md",
+    "LICENSE.txt",
+    "GUIDELINES.md",
+    "README.md",
+    "docs/readme.md",
+    "docs/scripting/0 - Low level text format.md",
+    "docs/scripting/1 - Basic syntax.md",
+    "docs/scripting/2 - Builtin environment.md",
+    "docs/scripting/3 - Quirks.md",
+    "docs/scripting/4 - Optimizations.md",
+    "docs/scripting/5 - Templates.md",
+    "docs/files/",
+    "docs/common/",
+    "docs/tutorials/"
+  ],
+  "files": []
+}
