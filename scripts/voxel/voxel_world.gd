@@ -33,7 +33,9 @@ const TERRAIN_COLLISION_LAYER := 33
 @export var lod_count: int = 5
 @export var lod_distance: float = 64.0
 @export var view_distance: int = 512
-@export var collision_view_distance: int = 192
+## Collision must reach the far feature zones (±180 m ⇒ ~255 m corners) so the
+## nav graph can sample terrain under ALL districts, not just near the spawn.
+@export var collision_view_distance: int = 272
 ## When there is no baked world, generate live using the dev generator in
 ## res://tools/worldgen/ (present in the repo, excluded from exports).
 @export var allow_live_dev_generator: bool = true

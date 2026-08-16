@@ -48,6 +48,9 @@ func _ready() -> void:
 ## collision streams in asynchronously, so wait for it — otherwise the graph
 ## samples nothing and enemies fall through the world (the old freeze/fall bug).
 func _start_world_systems() -> void:
+	# VoxelWorld sits after WorldContent in the scene, so its _ready (which
+	# activates the voxel terrain) hasn't run yet — let one frame pass first.
+	await get_tree().process_frame
 	var voxel := _voxel_world()
 	if voxel != null:
 		var waited := 0.0
