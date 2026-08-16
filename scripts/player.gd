@@ -118,13 +118,18 @@ func _unhandled_input(event: InputEvent) -> void:
 	if Input.mouse_mode != Input.MOUSE_MODE_CAPTURED:
 		return
 
+	# Voxel build mode (B) borrows LMB/RMB for mine/place — see voxel_edit_tool.gd.
+	var building: bool = get_meta("build_mode_active", false)
+
 	if event.is_action_pressed("use_item"):
-		_try_use_selected_item()
+		if not building:
+			_try_use_selected_item()
 		get_viewport().set_input_as_handled()
 		return
 
 	if event.is_action_pressed("punch"):
-		_try_punch()
+		if not building:
+			_try_punch()
 		get_viewport().set_input_as_handled()
 		return
 

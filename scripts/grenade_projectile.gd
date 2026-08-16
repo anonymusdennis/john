@@ -5,6 +5,8 @@ extends RigidBody3D
 @export var blast_radius: float = 6.0
 @export var blast_force: float = 28.0
 @export var blast_up: float = 8.0
+## Potatonades carve craters into the voxel terrain (fraction of blast_radius).
+@export var voxel_crater_scale: float = 0.7
 
 var _fuse_left: float = 0.0
 var _exploded: bool = false
@@ -79,8 +81,15 @@ func _explode() -> void:
 			else:
 				cb.velocity += to.normalized() * blast_force * 0.45 * falloff + Vector3.UP * blast_up * 0.6 * falloff
 
+	_carve_voxel_crater(origin)
 	_spawn_flash(origin)
 	queue_free()
+
+
+func _carve_voxel_crater(origin: Vector3) -> void:
+	var world := get_tree().get_first_node_in_group("voxel_world")
+	if world != null and world.has_method("carve_sphere") and world.call("is_active"):
+		world.carve_sphere(origin, blast_radius * voxel_crater_scale)
 
 
 func _spawn_flash(origin: Vector3) -> void:

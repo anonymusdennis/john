@@ -4,6 +4,22 @@ Briefing package for a **genius-mode AI** implementing a Space-Engineers-style v
 
 **This folder contains no game code.** It is context, requirements, block catalogs, and references only.
 
+> **Status: IMPLEMENTED.** See [IMPLEMENTATION-NOTES.md](IMPLEMENTATION-NOTES.md) for the
+> architecture, bake instructions and runtime controls. Code lives in:
+>
+> | Path | Purpose |
+> |------|---------|
+> | [`../scripts/voxel/voxel_world.gd`](../scripts/voxel/voxel_world.gd) | Runtime terrain host + edit API (carve/place/paint) |
+> | [`../scripts/voxel/voxel_edit_tool.gd`](../scripts/voxel/voxel_edit_tool.gd) | B build mode: mine/place, material cycle, brush |
+> | [`../scripts/voxel/block_registry.gd`](../scripts/voxel/block_registry.gd) | 04-block-catalog.json → 16 material channels |
+> | [`../scripts/voxel/voxel_terrain.gdshader`](../scripts/voxel/voxel_terrain.gdshader) | SE-style procedural terrain shader (Mixel4) |
+> | [`../scripts/voxel/voxel_water.gdshader`](../scripts/voxel/voxel_water.gdshader) | Stylized static water |
+> | [`../tools/worldgen/bg_model.gd`](../tools/worldgen/bg_model.gd) | Big Globe-inspired generator math |
+> | [`../tools/worldgen/bake_world.gd`](../tools/worldgen/bake_world.gd) | Offline baker → `res://world/world.sqlite` |
+> | [`../tools/worldgen/bg_generator.gd`](../tools/worldgen/bg_generator.gd) | Live dev generator (editor iteration) |
+> | [`../tools/worldgen/validate_voxel_build.gd`](../tools/worldgen/validate_voxel_build.gd) | Checks your Godot build has the voxel module |
+> | [`../tools/worldgen/bake_config.json`](../tools/worldgen/bake_config.json) | World size / seed / LOD config |
+
 ---
 
 ## Read order

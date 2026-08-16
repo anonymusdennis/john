@@ -3,6 +3,7 @@
 [ext_resource type="PackedScene" uid="uid://dfkf2rtftxxrv" path="res://scenes/player.tscn" id="1_player"]
 [ext_resource type="Script" uid="uid://y34aqocb7nqn" path="res://scripts/world_builder.gd" id="2_world"]
 [ext_resource type="Script" uid="uid://6n5ld7ay8roo" path="res://scripts/inventory_ui.gd" id="3_invui"]
+[ext_resource type="Script" path="res://scripts/voxel/voxel_world.gd" id="4_voxel"]
 
 [sub_resource type="ProceduralSkyMaterial" id="SkyMat"]
 sky_top_color = Color(0.35, 0.55, 0.85, 1)
@@ -65,6 +66,9 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.1, 10)
 
 [node name="WorldContent" type="Node3D" parent="." unique_id=357979429]
 script = ExtResource("2_world")
+
+[node name="VoxelWorld" type="Node3D" parent="." unique_id=1522480391]
+script = ExtResource("4_voxel")
 
 [node name="InventoryUI" type="CanvasLayer" parent="." unique_id=1805992879]
 script = ExtResource("3_invui")
