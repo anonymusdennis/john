@@ -53,10 +53,9 @@ func _start_world_systems() -> void:
 	await get_tree().process_frame
 	var voxel := _voxel_world()
 	if voxel != null:
-		var waited := 0.0
-		while not voxel.is_terrain_ready() and waited < 30.0:
+		var deadline := Time.get_ticks_msec() + 30000
+		while not voxel.is_terrain_ready() and Time.get_ticks_msec() < deadline:
 			await get_tree().process_frame
-			waited += get_process_delta_time()
 	_start_nav_graph()
 	_spawn_enemies()
 	await _drain_enemy_queue()

@@ -31,8 +31,8 @@ var _model: TerrainModel = null
 var _cache := {}
 var _tree_cells := {}                   # Vector2i -> Node3D container
 var _grass_cells := {}                  # Vector2i -> Node3D container
-var _queue: Array = []                  # [is_tree: bool, cell: Vector2i]
-var _queued := {}                       # dedupe set
+var _queue: Array = []                  # Vector3i(is_tree, cell.x, cell.y)
+var _queued := {}                       # dedupe set of the same Vector3i keys
 var _player: Node3D = null
 var _scan_timer := 0.0
 
@@ -70,9 +70,9 @@ func _process(delta: float) -> void:
 		_refresh_focus()
 	var budget := CELLS_PER_FRAME
 	while budget > 0 and not _queue.is_empty():
-		var job: Array = _queue.pop_front()
+		var job: Vector3i = _queue.pop_front()
 		_queued.erase(job)
-		_build_cell(job[0], job[1])
+		_build_cell(job.x == 1, Vector2i(job.y, job.z))
 		budget -= 1
 	# Keep the model query cache from growing without bound on long sessions.
 	if _cache.size() > 150000:
@@ -105,19 +105,17 @@ func _scan_grid(is_tree: bool, p: Vector3, radius: float, cell: float, cells: Di
 			var center := Vector2((cx + 0.5) * cell, (cz + 0.5) * cell)
 			if center.distance_to(Vector2(p.x, p.z)) > radius + cell:
 				continue
-			var job := [is_tree, key]
+			var job := Vector3i(1 if is_tree else 0, cx, cz)
 			if _queued.has(job):
 				continue
 			new_jobs.append(job)
 	if new_jobs.is_empty():
 		return
-	var pp := Vector2(p.x, p.z)
-	new_jobs.sort_custom(func(a, b):
-		var ca: Vector2i = a[1]
-		var cb: Vector2i = b[1]
-		return Vector2(ca.x, ca.y).distance_squared_to(pp / cell) \
-				< Vector2(cb.x, cb.y).distance_squared_to(pp / cell))
-	for job in new_jobs:
+	var pp := Vector2(p.x, p.z) / cell
+	new_jobs.sort_custom(func(a: Vector3i, b: Vector3i):
+		return Vector2(a.y, a.z).distance_squared_to(pp) \
+				< Vector2(b.y, b.z).distance_squared_to(pp))
+	for job: Vector3i in new_jobs:
 		_queued[job] = true
 		_queue.append(job)
 

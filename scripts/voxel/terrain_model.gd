@@ -447,7 +447,7 @@ func _cell_feature(cx: int, cz: int, cache: Dictionary) -> Dictionary:
 			return {
 				"type": "tree_oak", "pos": Vector3(wx, h, wz),
 				"scale": 0.85 + _cell_rand(cx, cz, 5) * 0.55,
-				"variant": int(_cell_rand(cx, cz, 6) * 4.0),
+				"variant": mini(int(_cell_rand(cx, cz, 6) * 4.0), 3),
 			}
 		return {}
 
@@ -458,7 +458,7 @@ func _cell_feature(cx: int, cz: int, cache: Dictionary) -> Dictionary:
 			return {
 				"type": "tree_pine", "pos": Vector3(wx, h, wz),
 				"scale": 0.8 + _cell_rand(cx, cz, 5) * 0.6,
-				"variant": int(_cell_rand(cx, cz, 6) * 4.0),
+				"variant": mini(int(_cell_rand(cx, cz, 6) * 4.0), 3),
 			}
 	return {}
 
