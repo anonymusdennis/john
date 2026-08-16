@@ -1,0 +1,13 @@
+{
+	"seed": 1337,
+	"size_x": 2048,
+	"size_z": 2048,
+	"y_min": -512,
+	"y_max": 256,
+	"sea_level": 0.0,
+	"core_top_y": -430.0,
+	"mountain_amp": 340.0,
+	"elev_amp": 190.0,
+	"lods": 5,
+	"out_dir": "res://world"
+}
