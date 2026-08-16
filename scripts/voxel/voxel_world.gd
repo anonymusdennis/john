@@ -1,23 +1,29 @@
 extends Node3D
 ## VoxelWorld — runtime host for the smooth voxel terrain (godot_voxel module).
 ##
-## Space Engineers-style destructible world:
-## - Streams the baked Big Globe-inspired world from a VoxelStreamSQLite database
-##   (baked offline by tools/worldgen/bake_world.gd — the generator never ships).
+## Steered fantasy world (see scripts/voxel/terrain_model.gd):
+## - Streams the baked world from a VoxelStreamSQLite database (baked offline by
+##   tools/worldgen/bake_world.gd — the generator never ships).
 ## - Meshes with VoxelMesherTransvoxel (smooth isosurface — no cubes).
 ## - Exposes carve/place/paint sphere edits used by the player build tool and
-##   by potatonades.
+##   by potatonades. Carving below the bedrock slab is refused.
 ## - Persists player edits: the baked database is copied to user:// on first run
 ##   and modified blocks are saved back into that copy.
+## - Rebuilds the same TerrainModel from baked metadata (or the dev config) so
+##   gameplay code can query terrain heights, and spawns the vegetation system.
 ##
 ## IMPORTANT: this script is stock-Godot safe. It never references godot_voxel
 ## classes statically — everything goes through ClassDB. Without the module the
 ## game boots normally and keeps the legacy flat Ground.
 
 signal voxel_edited(center: Vector3, radius: float)
+## Fired once real voxel collision exists under the player's spawn — safe to
+## build the nav graph and spawn enemies.
+signal terrain_ready
 
 const BAKED_DB_PATH := "res://world/world.sqlite"
 const BAKED_META_PATH := "res://world/world_meta.json"
+const DEV_CONFIG_PATH := "res://tools/worldgen/bake_config.json"
 const USER_DIR := "user://voxel"
 const USER_DB_PATH := "user://voxel/world.sqlite"
 
@@ -36,7 +42,10 @@ var _terrain: Variant = null            # VoxelLodTerrain (duck-typed)
 var _viewer: Variant = null             # VoxelViewer (duck-typed)
 var _registry: VoxelBlockRegistry = null
 var _meta: Dictionary = {}
+var _model: TerrainModel = null
+var _model_cache := {}                  # main-thread-only query cache
 var _active := false
+var _terrain_ready := false
 var _spawn_platform: StaticBody3D = null
 var _save_timer: Timer = null
 
@@ -52,6 +61,7 @@ func _ready() -> void:
 		return
 
 	_meta = _load_meta()
+	_model = _build_model()
 	var stream: Variant = _prepare_stream()
 	var generator: Variant = null
 	if stream == null:
@@ -69,6 +79,7 @@ func _ready() -> void:
 	_build_water()
 	_setup_autosave()
 	_spawn_edit_tool()
+	_spawn_vegetation()
 	print("[VoxelWorld] Voxel terrain active. bounds=%s" % [str(_bounds())])
 
 
@@ -76,11 +87,34 @@ func is_active() -> bool:
 	return _active
 
 
+func is_terrain_ready() -> bool:
+	return _terrain_ready
+
+
+## The terrain math model rebuilt from baked metadata (null when inactive).
+func model() -> TerrainModel:
+	return _model
+
+
+## Terrain surface height at world (x, z) — main thread only.
+func get_surface_height(wx: float, wz: float) -> float:
+	if _model == null:
+		return 0.0
+	return _model.height_at(wx, wz, _model_cache)
+
+
 ## --- Editing API (used by voxel_edit_tool.gd and grenade_projectile.gd) -------
 
 func carve_sphere(center: Vector3, radius: float) -> void:
 	if not _active:
 		return
+	# The bedrock slab is indestructible — clamp carves so they can't break
+	# through the world floor.
+	if _model != null:
+		var max_r := center.y - (_model.bedrock_top_y + 0.5)
+		if max_r <= 0.25:
+			return
+		radius = minf(radius, max_r)
 	var vt: Variant = _terrain.get_voxel_tool()
 	vt.channel = 1                        # VoxelBuffer.CHANNEL_SDF
 	vt.mode = 1                           # VoxelTool.MODE_REMOVE
@@ -154,6 +188,26 @@ func _load_meta() -> Dictionary:
 	return parsed if parsed is Dictionary else {}
 
 
+## Rebuild the terrain math model. Baked worlds carry their full generation
+## config in world_meta.json; the live dev path reads the same config the
+## generator uses. Either way, heights queried here match the voxels.
+func _build_model() -> TerrainModel:
+	var m := TerrainModel.new()
+	var cfg: Variant = _meta.get("config")
+	if cfg is Dictionary and not (cfg as Dictionary).is_empty():
+		m.configure(cfg)
+		return m
+	if FileAccess.file_exists(DEV_CONFIG_PATH):
+		var f := FileAccess.open(DEV_CONFIG_PATH, FileAccess.READ)
+		if f != null:
+			var parsed: Variant = JSON.parse_string(f.get_as_text())
+			if parsed is Dictionary:
+				m.configure(parsed)
+				return m
+	m.configure({})
+	return m
+
+
 ## Copies the shipped baked database into user:// (once) so edits persist
 ## without touching the shipped data. Returns a VoxelStreamSQLite or null.
 func _prepare_stream() -> Variant:
@@ -200,7 +254,7 @@ func _copy_file(from_path: String, to_path: String) -> bool:
 func _load_dev_generator() -> Variant:
 	if not allow_live_dev_generator:
 		return null
-	const GEN_PATH := "res://tools/worldgen/bg_generator.gd"
+	const GEN_PATH := "res://tools/worldgen/terrain_generator.gd"
 	if not ResourceLoader.exists(GEN_PATH):
 		return null
 	var script: Variant = load(GEN_PATH)
@@ -214,8 +268,8 @@ func _load_dev_generator() -> Variant:
 
 func _bounds() -> AABB:
 	var b: Dictionary = _meta.get("bounds", {})
-	var bmin: Array = b.get("min", [-1024.0, -512.0, -1024.0])
-	var bsize: Array = b.get("size", [2048.0, 768.0, 2048.0])
+	var bmin: Array = b.get("min", [-1024.0, -80.0, -1024.0])
+	var bsize: Array = b.get("size", [2048.0, 400.0, 2048.0])
 	return AABB(
 		Vector3(bmin[0], bmin[1], bmin[2]),
 		Vector3(bsize[0], bsize[1], bsize[2]))
@@ -264,8 +318,6 @@ func _make_terrain_material() -> ShaderMaterial:
 	mat.shader = load("res://scripts/voxel/voxel_terrain.gdshader")
 	mat.set_shader_parameter("u_albedo", VoxelBlockRegistry.channel_albedos())
 	mat.set_shader_parameter("u_params", VoxelBlockRegistry.channel_params())
-	var core_top: float = float(_meta.get("core_top_y", -430.0))
-	mat.set_shader_parameter("u_core_top_y", core_top)
 	return mat
 
 
@@ -310,7 +362,9 @@ func _spawn_point() -> Vector3:
 	var s: Array = _meta.get("spawn", [])
 	if s.size() == 3:
 		return Vector3(s[0], s[1], s[2])
-	return Vector3(0, 40, 10)
+	if _model != null:
+		return _model.find_spawn(_model_cache)
+	return Vector3(0, 1, 10)
 
 
 func _check_spawn_ground(poll: Timer) -> void:
@@ -336,6 +390,8 @@ func _check_spawn_ground(poll: Timer) -> void:
 	_spawn_platform.queue_free()
 	_spawn_platform = null
 	poll.queue_free()
+	_terrain_ready = true
+	terrain_ready.emit()
 	print("[VoxelWorld] Voxel ground ready under player")
 
 
@@ -388,6 +444,16 @@ func _spawn_edit_tool() -> void:
 	var tool: Node = tool_script.new()
 	tool.name = "EditTool"
 	add_child(tool)
+
+
+## Streamed grass + realistic mesh trees, driven by the terrain model.
+func _spawn_vegetation() -> void:
+	if _model == null:
+		return
+	var veg := VoxelVegetation.new()
+	veg.name = "Vegetation"
+	veg.setup(_model)
+	add_child(veg)
 
 
 func _exit_tree() -> void:

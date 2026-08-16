@@ -13,6 +13,8 @@ const KegelKing = preload("res://scripts/kegel_king.gd")
 @export var seed_value: int = 42
 @export var enemy_count: int = 12
 
+var _enemy_queue: Array = []
+
 ## Per-form navigation & physique presets: spiders wall-walk, imps and humans
 ## parkour (jump + ledge climb), heavy centaurs can still hop low obstacles.
 const ENEMY_DEFAULTS := {
@@ -36,10 +38,25 @@ func _ready() -> void:
 	_build_ball_pit(Vector3(-18, 0, 6), rng)
 	_build_kegel_set(Vector3(-12, 0, -10))
 	_build_ramps_and_decor()
-	_start_nav_graph()
 	# Feature-showcase districts on the 400x400 map.
 	_build_zones(rng)
+	# Nav graph + enemies wait for voxel ground when the voxel world is active.
+	_start_world_systems()
+
+
+## Nav graph and enemies need real ground collision. On the voxel terrain that
+## collision streams in asynchronously, so wait for it — otherwise the graph
+## samples nothing and enemies fall through the world (the old freeze/fall bug).
+func _start_world_systems() -> void:
+	var voxel := _voxel_world()
+	if voxel != null:
+		var waited := 0.0
+		while not voxel.is_terrain_ready() and waited < 30.0:
+			await get_tree().process_frame
+			waited += get_process_delta_time()
+	_start_nav_graph()
 	_spawn_enemies()
+	await _drain_enemy_queue()
 
 
 ## Feature districts, each demonstrating one system from the smart-nav update.
@@ -69,7 +86,31 @@ func _start_nav_graph() -> void:
 	# The build is time-budgeted per frame, so the larger bake streams in
 	# progressively instead of freezing the main thread like the old
 	# monolithic 400×400 bake did.
-	graph.configure(AABB(Vector3(-180, -6, -180), Vector3(360, 56, 360)))
+	var y_min := -6.0
+	var y_max := 50.0
+	var voxel := _voxel_world()
+	if voxel != null and voxel.model() != null:
+		# The hub vale is flat, but its blend rim rises toward the corners of
+		# the region — extend the ceiling so those slopes stay walkable.
+		var mh: float = voxel.model().max_height_in_rect(-180, -180, 180, 180, 16.0, {})
+		y_max = maxf(y_max, mh + 24.0)
+	graph.configure(AABB(Vector3(-180, y_min, -180), Vector3(360, y_max - y_min, 360)))
+
+
+## The active VoxelWorld node, or null when running on the legacy flat ground.
+func _voxel_world() -> Node:
+	var voxel := get_tree().get_first_node_in_group("voxel_world")
+	if voxel != null and voxel.has_method("is_active") and voxel.is_active():
+		return voxel
+	return null
+
+
+## Terrain height at (x, z) — voxel model when active, else the flat ground.
+func _ground_height(wx: float, wz: float) -> float:
+	var voxel := _voxel_world()
+	if voxel != null:
+		return voxel.get_surface_height(wx, wz)
+	return 0.0
 
 
 func _mat(color: Color, rough: float = 0.8, metal: float = 0.0) -> StandardMaterial3D:
@@ -427,13 +468,34 @@ func _spawn_enemies() -> void:
 			"form": forms[rng.randi_range(0, forms.size() - 1)],
 			"pos": Vector3(cos(ang) * r, 0.1, sin(ang) * r),
 		})
+	# Enemies are queued (not instantiated) during world build; see
+	# _drain_enemy_queue for the staggering that fixes the spawn freeze.
 	for s in spawns.slice(0, enemy_count):
 		_spawn_enemy(root, s["form"], s["pos"], s.get("cfg", {}))
 
 
+## Queues one enemy spawn. Every enemy builds a procedural mesh in _ready(),
+## and a same-frame burst of those builds froze the game above ~10 enemies —
+## so requests are queued and drained one per frame by _drain_enemy_queue.
+func _spawn_enemy(root: Node3D, form: String, pos: Vector3, overrides: Dictionary = {}) -> void:
+	_enemy_queue.append([root, form, pos, overrides])
+
+
+func _drain_enemy_queue() -> void:
+	while not _enemy_queue.is_empty():
+		var job: Array = _enemy_queue.pop_front()
+		var root := job[0] as Node3D
+		if is_instance_valid(root):
+			_spawn_enemy_now(root, job[1], job[2], job[3])
+		await get_tree().process_frame
+
+
 ## Instantiates one enemy with per-form navigation/physique defaults;
 ## `overrides` may tweak any exported property (nav_mode, grip_strength, ...).
-func _spawn_enemy(root: Node3D, form: String, pos: Vector3, overrides: Dictionary = {}) -> Node3D:
+## Spawn height snaps up to the terrain surface so enemies never start buried
+## on the voxel world; structure-mounted spawns (y above ground) are kept.
+func _spawn_enemy_now(root: Node3D, form: String, pos: Vector3, overrides: Dictionary) -> Node3D:
+	pos.y = maxf(pos.y, _ground_height(pos.x, pos.z) + 0.1)
 	var enemy := EnemyScene.instantiate()
 	enemy.body_form = form
 	var cfg: Dictionary = ENEMY_DEFAULTS.get(form, {}).duplicate()

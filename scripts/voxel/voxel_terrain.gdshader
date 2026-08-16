@@ -26,11 +26,6 @@ uniform vec4 u_albedo[16];
 // x = roughness, y = detail noise scale, z = detail noise strength
 uniform vec3 u_params[16];
 
-// Molten core glow: emissive cracks fade in below this world height.
-uniform float u_core_top_y = -430.0;
-uniform float u_core_fade = 60.0;
-uniform vec4 u_core_emission : source_color = vec4(1.0, 0.32, 0.06, 1.0);
-
 varying vec3 v_world_pos;
 varying vec3 v_world_normal;
 varying vec4 v_indices;
@@ -138,13 +133,4 @@ void fragment() {
 	ALBEDO = albedo;
 	ROUGHNESS = roughness;
 	METALLIC = 0.0;
-
-	// The Core — molten depths glow through crack veins.
-	float core_t = clamp((u_core_top_y - v_world_pos.y) / u_core_fade, 0.0, 1.0);
-	if (core_t > 0.0) {
-		float vein = fbm2(v_world_pos * 0.35);
-		vein = smoothstep(0.52, 0.72, vein);
-		EMISSION = u_core_emission.rgb * vein * core_t * 3.2;
-		ALBEDO = mix(ALBEDO, vec3(0.12, 0.08, 0.07), core_t * 0.7);
-	}
 }
