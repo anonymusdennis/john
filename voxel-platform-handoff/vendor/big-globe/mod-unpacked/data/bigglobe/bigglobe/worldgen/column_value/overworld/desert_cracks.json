@@ -1,0 +1,11 @@
+{
+	"type": "voronoi",
+	"params": {
+		"type": "voronoi",
+		"is_3d": false
+	},
+	"diagram": {
+		"distance": 6,
+		"variation": 6
+	}
+}

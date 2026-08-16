@@ -1,0 +1,6 @@
+{
+	"primary_entity": "minecraft:witch",
+	"script": [
+		"spawnParams.=$weight(0.0625L).=$count(1)"
+	]
+}

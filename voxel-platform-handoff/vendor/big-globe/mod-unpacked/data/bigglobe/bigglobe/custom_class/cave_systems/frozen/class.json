@@ -1,0 +1,5 @@
+{
+	"element_type": "class/enum",
+	"name": "FrozenCaveSystem",
+	"extends": "bigglobe:cave_systems/medium/class"
+}

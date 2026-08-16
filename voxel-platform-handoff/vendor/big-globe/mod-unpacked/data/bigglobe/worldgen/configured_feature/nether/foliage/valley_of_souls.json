@@ -1,0 +1,34 @@
+{
+	"type": "bigglobe:script",
+	"config": {
+		"script": [
+			"if (random.nextBoolean(0.125) && getBlockState(originX, originY - 1, originZ).hasFullCubeOutline():",
+				"random.if (0.25:",
+					"random.if (0.125:",
+						"random.if (0.25:",
+							"random.if (0.125:",
+								"placeBlockState(originX, originY, originZ, BlockState('minecraft:wither_skeleton_skull', rotation: random.nextInt(16)))",
+							")",
+							"else (",
+								"placeBlockState(originX, originY, originZ, BlockState('minecraft:skeleton_skull', rotation: random.nextInt(16)))",
+							")",
+						")",
+						"else (",
+							"placeBlockState(originX, originY, originZ, 'minecraft:wither_rose')",
+						")",
+					")",
+					"else (",
+						"placeBlockState(originX, originY, originZ, 'bigglobe:wart_weed')",
+					")",
+				")",
+				"else (",
+					"placeBlockState(originX, originY, originZ, 'bigglobe:charred_grass')",
+				")",
+				"return(true)",
+			")",
+			"else (",
+				"return(false)",
+			")"
+		]
+	}
+}

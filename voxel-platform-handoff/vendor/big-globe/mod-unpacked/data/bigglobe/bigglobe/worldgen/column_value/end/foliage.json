@@ -1,0 +1,8 @@
+{
+	"type": "bigglobe:script",
+	"params": {
+		"type": "float",
+		"is_3d": false
+	},
+	"script": "raw_foliage - raw_mountain_thickness.as(float) - spiral.as(float)"
+}

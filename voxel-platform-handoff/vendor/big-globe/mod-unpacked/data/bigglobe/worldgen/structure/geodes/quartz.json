@@ -1,0 +1,55 @@
+{
+	"type": "bigglobe:geode",
+	"biomes": "#bigglobe:has_structure/quartz_geodes",
+	"spawn_overrides": {
+		"ambient":                    { "bounding_box": "full", "spawns": [] },
+		"axolotls":                   { "bounding_box": "full", "spawns": [] },
+		"creature":                   { "bounding_box": "full", "spawns": [] },
+		"misc":                       { "bounding_box": "full", "spawns": [] },
+		"monster":                    { "bounding_box": "full", "spawns": [] },
+		"underground_water_creature": { "bounding_box": "full", "spawns": [] },
+		"water_ambient":              { "bounding_box": "full", "spawns": [] },
+		"water_creature":             { "bounding_box": "full", "spawns": [] }
+	},
+	"step": "raw_generation",
+	"min_y": "world_traits.`bigglobe:min_y`",
+	"surface_y": "world_traits.`bigglobe:max_y`",
+	"noise": {
+		"type": "sum",
+		"layers": [
+			{ "type": "constant", "value": 32.0 },
+			{ "type": "smooth", "scale": 32, "amplitude": 16.0 },
+			{ "type": "smooth", "scale": 16, "amplitude":  8.0 },
+			{ "type": "smooth", "scale":  8, "amplitude":  4.0 },
+			{ "type": "smooth", "scale":  4, "amplitude":  2.0 },
+			{ "type": "linear", "scale":  2, "amplitude":  1.0 }
+		]
+	},
+	"radius": { "type": "uniform", "min": 16.0, "max": 64.0 },
+	"blocks": [
+		{ "threshold": 4.0, "states": "minecraft:smooth_basalt" },
+		{ "threshold": 8.0, "states": "minecraft:calcite" },
+		{
+			"threshold": 12.0,
+			"states": [
+				{ "weight": 7.0, "state": "bigglobe:rough_quartz" },
+				{ "weight": 1.0, "state": "bigglobe:budding_quartz" }
+			]
+		}
+	],
+	"spikes": {
+		"large_radius": { "type": "uniform",     "min": 2.0,      "max": 4.0   },
+		"small_radius": 1.0,
+		"length":       { "type": "uniform",     "min": 4.0,      "max": 8.0   },
+		"commonness":   { "type": "exponential", "min": 0.015625, "max": 0.125 },
+		"crookedness":  { "type": "linear_high", "min": 0.0,      "max": 6.0   }
+	},
+	"growth": {
+		"place": "#bigglobe:quartz_buds",
+		"against": [
+			"bigglobe:rough_quartz",
+			"bigglobe:budding_quartz"
+		]
+	},
+	"terrain_adaptation": "bury"
+}

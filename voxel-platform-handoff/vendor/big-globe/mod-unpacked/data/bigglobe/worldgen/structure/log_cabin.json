@@ -1,0 +1,20 @@
+{
+	"type": "bigglobe:script",
+	"biomes": "#bigglobe:has_structure/log_cabin",
+	"spawn_overrides": {},
+	"step": "surface_structures",
+	"layout": [
+		"int originY = world_traits.`bigglobe:y_level_on_surface`",
+		"WoodPalette palette = `bigglobe:overworld/wood_palette` ?: return()",
+		"unless (palette.isIn('#bigglobe:log_cabin_materials'): return())",
+		"pieces.add(",
+			"ScriptStructurePiece.new(",
+				"-5, -1, -5, 5, 11, 5,",
+				"'bigglobe:log_cabin',",
+				"nbtCompound(palette: palette.id)",
+			")",
+			".symmetrify(Symmetry.randomRotationAndFlip())",
+			".offset(originX, originY, originZ)",
+		")"
+	]
+}

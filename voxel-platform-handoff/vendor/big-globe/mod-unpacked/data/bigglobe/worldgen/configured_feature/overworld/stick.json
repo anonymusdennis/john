@@ -1,0 +1,22 @@
+{
+	"type": "bigglobe:script",
+	"config": {
+		"script": [
+			"BlockState under = null",
+			"int y = 0",
+			"block (",
+				"unless (isYLevelValid(y - 1): return(false))",
+				"if ((under := getBlockState(0, y - 1, 0)).isReplaceable(): --y,, continue())",
+			")",
+			"unless (",
+				"under.isIn('#minecraft:sand') || (",
+					"BlockState state = getBlockState(0, y, 0),,",
+					"state.getBlock() ==. 'minecraft:snow' || state.hasLava()",
+				")",
+			":",
+				"return(placeBlockState(0, y, 0, 'bigglobe:stick[waterlogged=false]'))",
+			")",
+			"return(false)"
+		]
+	}
+}

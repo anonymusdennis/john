@@ -1,0 +1,18 @@
+{
+	"type": "minecraft:crafting_shaped",
+	"category": "misc",
+	"pattern": [
+		"dud",
+		"dcd",
+		"ddd"
+	],
+	"key": {
+		"d": "minecraft:diamond",
+		"c": "bigglobe:void_cloud",
+		"u": "bigglobe:voidmetal_upgrade"
+	},
+	"result": {
+		"count": 2,
+		"id": "bigglobe:voidmetal_upgrade"
+	}
+}

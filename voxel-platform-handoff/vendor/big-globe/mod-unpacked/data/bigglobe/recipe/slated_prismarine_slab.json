@@ -1,0 +1,13 @@
+{
+	"type": "minecraft:crafting_shaped",
+	"pattern": [
+		"###"
+	],
+	"key": {
+		"#": "bigglobe:slated_prismarine"
+	},
+	"result": {
+		"count": 6,
+		"id": "bigglobe:slated_prismarine_slab"
+	}
+}

@@ -1,0 +1,10 @@
+{
+	"type": "script",
+	"params": {
+		"type": "double",
+		"is_3d": false
+	},
+	"script": [
+		"`raw/mountainness` * obelisk_terrain_suppression"
+	]
+}

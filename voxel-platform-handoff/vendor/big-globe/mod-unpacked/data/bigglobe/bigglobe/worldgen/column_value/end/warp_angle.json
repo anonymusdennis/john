@@ -1,0 +1,8 @@
+{
+	"type": "bigglobe:script",
+	"params": {
+		"type": "double",
+		"is_3d": false
+	},
+	"script": "fastAtan2(warp_x, warp_z)"
+}

@@ -1,0 +1,31 @@
+{
+	"raw_placement": [
+		"BlockState fluid = BlockState(data.fluid.asString())",
+		"double radiusSquared = (piece.sizeX >> 1) ^ 2",
+		"int topY = data.topY.?asInt() ?: piece.maxY ;backwards compatibility",
+		"for (",
+			"int z in range[chunkMinZ, chunkMaxZ],",
+			"int x in range[chunkMinX, chunkMaxX]",
+		":",
+			"double distanceSquared = (x - piece.midX) ^ 2 + (z - piece.midZ) ^ 2",
+			"if (distanceSquared < radiusSquared:",
+				"for (int y in range[ceilInt(world_traits.`bigglobe:automatic_exact_surface_y`(x, piece.minY, z)), topY - 4):",
+					"setBlockState(x, y, z, fluid)",
+				")",
+			")",
+		")"
+	],
+	"placement": [
+		"int topY = data.topY.?asInt() ?: piece.maxY ;backwards compatibility",
+		"double radiusSquared = (piece.sizeX >> 1) ^ 2",
+		"for (",
+			"ConfiguredFeature feature in ConfiguredFeatureTag(data.decorators.asString() ?: '#bigglobe:empty'),",
+			"int z in range[chunkMinZ, chunkMaxZ],",
+			"int x in range[chunkMinX, chunkMaxX]",
+		":",
+			"if ((x - midX) ^ 2 + (z - midZ) ^ 2 < radiusSquared:",
+				"placeFeature(x, topY - 4, z, feature)",
+			")",
+		")"
+	]
+}

@@ -1,0 +1,17 @@
+{
+	"type": "minecraft:crafting_shaped",
+	"pattern": [
+		"a",
+		"b",
+		"c"
+	],
+	"key": {
+		"a": "#c:sulfurs",
+		"b": "minecraft:stick",
+		"c": "#minecraft:soul_fire_base_blocks"
+	},
+	"result": {
+		"count": 4,
+		"id": "minecraft:soul_torch"
+	}
+}

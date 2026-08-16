@@ -1,0 +1,13 @@
+{
+	"type": "bigglobe:script",
+	"config": {
+		"script": [
+			"OakTreeGenerator",
+			".create(world, random, 'minecraft:oak')",
+			".=$requireValidGround(true)",
+			".placeNatural(originX, originY, originZ)"
+		],
+		"queue": "delayed",
+		"max_radius_in_blocks": 64
+	}
+}

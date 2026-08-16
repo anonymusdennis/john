@@ -1,0 +1,47 @@
+{
+	"type": "bigglobe:natural_tree",
+	"config": {
+		"palette": "minecraft:birch",
+		"height": "12.0L - 6.0L * max(world_traits.`bigglobe:foliage_at`, 0.0I) * fastLog2(max(random.nextDouble(), 2x1.0p-8L))",
+		"trunk": {
+			"type": "bigglobe:straight",
+			"thickness": "mixLinear(max(height * 0.0625L, minThickness), minThickness, fraction)",
+			"require_natural_ground": true,
+			"can_generate_in_liquid": false
+		},
+		"branches": {
+			"start_frac_y": { "type": "uniform", "min": 0.25, "max": 0.5 },
+			"count_per_layer": { "type": "uniform", "min": 2.0, "max": 4.0 },
+			"length_function": "fraction - fraction * fraction",
+			"height_function": "fraction * 0.25"
+		},
+		"decorations": {
+			"trunk": [
+				{ "type": "bigglobe:random_walk_leaves", "is_trunk": true },
+				{ "type": "bigglobe:adjacent_leaf", "chance": 0.25 },
+				{ "type": "bigglobe:snow", "chance": "world_traits.`bigglobe:snow_chance_at`" }
+			],
+			"branches": [
+				{ "type": "bigglobe:random_walk_leaves", "is_trunk": false },
+				{ "type": "bigglobe:snow", "chance": "world_traits.`bigglobe:snow_chance_at`" }
+			],
+			"leaves": [
+				{ "type": "bigglobe:snow", "chance": "world_traits.`bigglobe:snow_chance_at`" },
+				{ "type": "bigglobe:feature", "feature": "bigglobe:overworld/trees/decorators/beehive_64th_chance" }
+			]
+		},
+		"ground_replacements": {
+			"minecraft:grass_block":     "minecraft:dirt",
+			"minecraft:podzol":          "minecraft:dirt",
+			"bigglobe:overgrown_podzol": "minecraft:dirt",
+			"minecraft:farmland":        "minecraft:dirt",
+			"minecraft:dirt":            "minecraft:dirt",
+			"minecraft:coarse_dirt":     "minecraft:coarse_dirt",
+			"minecraft:rooted_dirt":     "minecraft:rooted_dirt",
+			"minecraft:mud":             "minecraft:mud",
+			"minecraft:packed_mud":      "minecraft:packed_mud"
+		},
+		"delay_generation": true,
+		"max_radius_in_blocks": 16
+	}
+}

@@ -1,0 +1,14 @@
+{
+	"type": "bigglobe:hyperspace",
+	"generator": {
+		"type": "bigglobe:empty",
+		"height": {
+			"min_y": -64,
+			"max_y":  64
+		},
+		"biome_source": {
+			"type": "minecraft:fixed",
+			"biome": "bigglobe:hyperspace"
+		}
+	}
+}

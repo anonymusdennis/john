@@ -1,0 +1,41 @@
+{
+	"script": [
+		"double peek2 = 0.8427 ^ 2 ;local maximum according to desmos.",
+		"int waterLevel = (minY + midY * 3) >> 2 - 1",
+		"for (",
+			"int z in range[chunkMinZ, chunkMaxZ],",
+			"int x in range[chunkMinX, chunkMaxX]",
+		":",
+			"double*(",
+				"relativeX = unmixLinear(double(midX), double(maxX), double(x))",
+				"relativeZ = unmixLinear(double(midZ), double(maxZ), double(z))",
+				"radius2 = relativeX ^ 2 + relativeZ ^ 2",
+			")",
+			"if (radius2 <= peek2:",
+				"int minWaterY = ceilInt(midY - sqrt(peek2 - radius2) * (maxY - midY))",
+				"boolean hadWater = false",
+				"for outer (int y in -range[minWaterY, waterLevel]:",
+					"if (getBlockState(x, y, z).isAir():",
+						"setBlockState(x, y, z, FLUID_STATE)",
+						"hadWater = true",
+					")",
+					"else if (hadWater:",
+						"for (int y2 in -range[y - random.nextInt(4), y]:",
+							"if (getBlockState(x, y2, z).isIn(SURFACE_FIND):",
+								"setBlockState(x, y2, z, SURFACE_REPLACE)",
+							")",
+							"else (",
+								"break(outer)",
+							")",
+						")",
+					")",
+				")",
+			")",
+		")"
+	],
+	"inputs": [
+		{ "name": "FLUID_STATE",     "type": "BlockState" },
+		{ "name": "SURFACE_FIND",    "type": "BlockTag"   },
+		{ "name": "SURFACE_REPLACE", "type": "BlockState" }
+	]
+}

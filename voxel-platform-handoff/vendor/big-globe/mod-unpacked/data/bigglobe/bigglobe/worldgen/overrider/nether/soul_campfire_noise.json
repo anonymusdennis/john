@@ -1,0 +1,41 @@
+{
+	"type": "column_value",
+	"script": [
+		"float unmixSmoothD2F(int*(low, high, y):",
+			"unmixSmooth(double(low), double(high), double(y)).as(float)",
+		")",
+		"for (StructureStart start in structures:",
+			"float offset = nan",
+			"if (start.structure ==. 'bigglobe:soul_campfire': offset = 0.5I)",
+			"else if (start.structure ==. 'minecraft:nether_fossil': offset = -0.5)",
+			"if (isNotNaN(offset):",
+				"float horizontalDistance = distanceToCircle(start).as(float)",
+				"if (horizontalDistance < 8.0I:",
+					"double bottomY = start.minY + offset",
+					"horizontalDistance *= 0.125I",
+					"double fade = horizontalDistance ^ 2 * 8.0L",
+					"double low  = bottomY - fade",
+					"double high = bottomY + fade",
+					"for (int y in range(start.minY - 8, start.maxY + 8):",
+						"float toAdd = (",
+							"low == high",
+							"? (y < bottomY ? 1.0I : -1.0I)",
+							": unmixSmooth(high, low, double(y)).as(float) * 2.0I - 1.0I",
+						")",
+						"toAdd *= unmixSmoothD2F(start.minY - 8, start.minY, y)",
+						"toAdd *= unmixSmoothD2F(start.maxY + 8, start.maxY, y)",
+						"toAdd *= smooth(1.0I - horizontalDistance)",
+						"`bigglobe:nether/noise`(y) += toAdd * 0.5I",
+					")",
+				")",
+			")",
+		")"
+	],
+	"structure_filter": {
+		"structure": [
+			"bigglobe:soul_campfire",
+			"minecraft:nether_fossil"
+		],
+		"radius_in_chunks": 1
+	}
+}

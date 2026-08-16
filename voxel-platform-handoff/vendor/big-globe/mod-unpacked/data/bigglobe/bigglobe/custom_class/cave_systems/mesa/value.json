@@ -1,0 +1,11 @@
+{
+	"element_type": "field/enum",
+	"owner": "bigglobe:cave_systems/base/class",
+	"impl_type": "bigglobe:cave_systems/mesa/class",
+	"name": "MESA",
+	"field_values": {
+		"decorator": "bigglobe:overworld/caves/mesa_decorator",
+		"dungeonFeature": "bigglobe:overworld/caves/random_dungeon_mesa",
+		"systemDepth": 384
+	}
+}

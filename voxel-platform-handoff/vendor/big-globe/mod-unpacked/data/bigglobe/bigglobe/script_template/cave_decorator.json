@@ -1,0 +1,23 @@
+{
+	"script": [
+		"if (FEATURE == null: return(false))",
+		"double*(",
+			"step = STEP * 2.0L",
+			"y = max(minValidYLevel, world_traits.`bigglobe:cave_min_y`) + random.nextDouble(step -: 1.0L)",
+			"maxY = min(maxValidYLevel, world_traits.`bigglobe:cave_max_y`)",
+		")",
+		"while ((y :+ random.nextDouble(1.0L, step)) < maxY:",
+			"int floorY = floorInt(y)",
+			"BlockState state = getBlockState(originX, floorY, originZ)",
+			"if (state.isAir() || (ALLOW_WATER && state.getBlock() ==. 'minecraft:water'):",
+				"placeFeature(originX, floorY, originZ, FEATURE)",
+			")",
+		")",
+		"return(true)"
+	],
+	"inputs": [
+		{ "name": "STEP",        "type": "double"            },
+		{ "name": "FEATURE",     "type": "ConfiguredFeature" },
+		{ "name": "ALLOW_WATER", "type": "boolean"           }
+	]
+}

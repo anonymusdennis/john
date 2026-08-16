@@ -1,0 +1,5 @@
+{
+	"element_type": "class/enum",
+	"name": "DrippingCaveSystem",
+	"extends": "bigglobe:cave_systems/hard/class"
+}

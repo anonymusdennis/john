@@ -1,0 +1,8 @@
+{
+	"type": "bigglobe:bedrock",
+	"config": {
+		"state": "minecraft:bedrock",
+		"full_y": 0,
+		"empty_y": 16
+	}
+}

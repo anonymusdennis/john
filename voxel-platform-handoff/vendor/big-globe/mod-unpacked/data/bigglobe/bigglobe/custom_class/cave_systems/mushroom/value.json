@@ -1,0 +1,10 @@
+{
+	"element_type": "field/enum",
+	"owner": "bigglobe:cave_systems/base/class",
+	"impl_type": "bigglobe:cave_systems/mushroom/class",
+	"name": "MUSHROOM",
+	"field_values": {
+		"decorator": "bigglobe:overworld/caves/mushroom_decorator",
+		"systemDepth": 256
+	}
+}

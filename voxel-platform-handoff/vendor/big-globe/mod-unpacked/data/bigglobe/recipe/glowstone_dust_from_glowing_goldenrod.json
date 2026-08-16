@@ -1,0 +1,9 @@
+{
+	"type": "minecraft:crafting_shapeless",
+	"ingredients": [
+		"bigglobe:glowing_goldenrod"
+	],
+	"result": {
+		"id": "minecraft:glowstone_dust"
+	}
+}

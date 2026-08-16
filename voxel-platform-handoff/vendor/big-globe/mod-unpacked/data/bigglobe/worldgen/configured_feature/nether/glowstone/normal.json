@@ -1,0 +1,13 @@
+{
+	"type": "bigglobe:script",
+	"config": {
+		"script": {
+			"debug_name": "ConfiguredFeatureNetherGlowstoneNormal",
+			"template": "bigglobe:glowstone",
+			"inputs": {
+				"SIZE": "int(fastExp2(random.nextDouble(log2(8.0), log2(128.0))))",
+				"STATE": "'minecraft:glowstone'"
+			}
+		}
+	}
+}

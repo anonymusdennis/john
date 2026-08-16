@@ -1,0 +1,26 @@
+{
+	"type": "bigglobe:script",
+	"config": {
+		"script": [
+			"(",
+				"hints.decorate &&",
+				"getBlockState(originX,     originY,     originZ    ).isIn('#minecraft:base_stone_nether') &&",
+				"getBlockState(originX - 1, originY,     originZ    ).isIn('#minecraft:base_stone_nether') &&",
+				"getBlockState(originX + 1, originY,     originZ    ).isIn('#minecraft:base_stone_nether') &&",
+				"getBlockState(originX,     originY - 1, originZ    ).isIn('#minecraft:base_stone_nether') &&",
+				"getBlockState(originX,     originY + 1, originZ    ).isIn('#minecraft:base_stone_nether') &&",
+				"getBlockState(originX,     originY,     originZ - 1).isIn('#minecraft:base_stone_nether') &&",
+				"getBlockState(originX,     originY,     originZ + 1).isIn('#minecraft:base_stone_nether')",
+			")",
+			".if (",
+				"setBlockState(originX - 1, originY,     originZ,     'minecraft:magma_block')",
+				"setBlockState(originX + 1, originY,     originZ,     'minecraft:magma_block')",
+				"setBlockState(originX,     originY - 1, originZ,     'minecraft:magma_block')",
+				"setBlockState(originX,     originY + 1, originZ,     'minecraft:magma_block')",
+				"setBlockState(originX,     originY,     originZ - 1, 'minecraft:magma_block')",
+				"setBlockState(originX,     originY,     originZ + 1, 'minecraft:magma_block')",
+				"setBlockState(originX,     originY,     originZ,     'bigglobe:hidden_lava')",
+			")"
+		]
+	}
+}

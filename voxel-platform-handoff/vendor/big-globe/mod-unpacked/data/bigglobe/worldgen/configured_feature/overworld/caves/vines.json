@@ -1,0 +1,22 @@
+{
+	"type": "bigglobe:script",
+	"config": {
+		"script": [
+			"unless (getBlockState(originX, originY + 1, originZ).hasFullCubeOutline(): return(false))",
+			"int height = 0",
+			"double chance = world_traits.`bigglobe:cave_surface_depth` * 0.125L",
+			"while (random.nextBoolean(chance) && getBlockState(originX, originY - height, originZ).isAir():",
+				"++height",
+			")",
+			"if (height <= 0: return(false))",
+			"for (int y = originY, height > 0, --y,, --height:",
+				"setBlockState(originX, y, originZ,",
+					"height == 1",
+					"? BlockState('cave_vines', age: 25, berries: random.nextBoolean(0.25))",
+					": BlockState('cave_vines_plant', berries: random.nextBoolean(0.25))",
+				")",
+			")",
+			"return(true)"
+		]
+	}
+}

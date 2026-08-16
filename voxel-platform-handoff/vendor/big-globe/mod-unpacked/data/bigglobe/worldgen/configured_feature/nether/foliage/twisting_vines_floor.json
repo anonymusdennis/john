@@ -1,0 +1,19 @@
+{
+	"type": "bigglobe:script",
+	"config": {
+		"script": [
+			"unless (getBlockState(0, -1, 0).hasFullCubeCollision(): return(false))",
+			"int y = 0",
+			"while (getBlockState(0, y, 0).isAir():",
+				"setBlockState(0, y, 0, 'minecraft:twisting_vines_plant')",
+				"++y",
+				"unless (random.nextBoolean(): break())",
+			")",
+			"--y",
+			"if (getBlockState(0, y, 0) ==. 'minecraft:twisting_vines_plant':",
+				"setBlockState(0, y, 0, 'minecraft:twisting_vines[age=25]')",
+			")",
+			"return(true)"
+		]
+	}
+}

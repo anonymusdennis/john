@@ -1,0 +1,62 @@
+{
+	"script": [
+		"int*(",
+			"horizontalSize = random.nextInt(32, 96)",
+			"minX = originX - horizontalSize",
+			"minZ = originZ - horizontalSize",
+			"maxX = originX + horizontalSize",
+			"maxZ = originZ + horizontalSize",
+		")",
+		"double*(",
+			"verticalSize = horizontalSize / 4.0L",
+
+			"minY = max(",
+				"world_traits.`bigglobe:cave_min_y`(minX, minZ),",
+				"world_traits.`bigglobe:cave_min_y`(minX, originX),",
+				"world_traits.`bigglobe:cave_min_y`(minX, maxZ),",
+
+				"world_traits.`bigglobe:cave_min_y`(originX, minZ),",
+				"world_traits.`bigglobe:cave_min_y`(originX, originX),",
+				"world_traits.`bigglobe:cave_min_y`(originX, maxZ),",
+
+				"world_traits.`bigglobe:cave_min_y`(maxX, minZ),",
+				"world_traits.`bigglobe:cave_min_y`(maxX, originX),",
+				"world_traits.`bigglobe:cave_min_y`(maxX, maxZ)",
+			")",
+			"+ verticalSize",
+
+			"maxY = min(",
+				"world_traits.`bigglobe:cave_max_y`(minX, minZ),",
+				"world_traits.`bigglobe:cave_max_y`(minX, originZ),",
+				"world_traits.`bigglobe:cave_max_y`(minX, maxZ),",
+
+				"world_traits.`bigglobe:cave_max_y`(originX, minZ),",
+				"world_traits.`bigglobe:cave_max_y`(originX, originZ),",
+				"world_traits.`bigglobe:cave_max_y`(originX, maxZ),",
+
+				"world_traits.`bigglobe:cave_max_y`(maxX, minZ),",
+				"world_traits.`bigglobe:cave_max_y`(maxX, originZ),",
+				"world_traits.`bigglobe:cave_max_y`(maxX, maxZ)",
+			")",
+			"- verticalSize",
+		")",
+		"if (maxY > minY:",
+			"double centerY = random.nextDouble(minY, maxY)",
+			"pieces.add(",
+				"ScriptStructurePiece.new(",
+					"originX - horizontalSize,",
+					"floorInt(centerY - verticalSize),",
+					"originZ - horizontalSize,",
+					"originX + horizontalSize,",
+					"ceilInt(centerY + verticalSize),",
+					"originZ + horizontalSize,",
+					"TYPE,",
+					"nbtCompound()",
+				")",
+			")",
+		")"
+	],
+	"inputs": [
+		{ "name": "TYPE", "type": "ScriptStructurePlacement" }
+	]
+}

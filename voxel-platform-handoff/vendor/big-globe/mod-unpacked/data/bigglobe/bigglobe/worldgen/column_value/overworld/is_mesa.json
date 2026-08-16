@@ -1,0 +1,10 @@
+{
+	"type": "script",
+	"params": {
+		"type": "boolean",
+		"is_3d": false
+	},
+	"script": [
+		"is_desert && `raw/river/macro` > 0.0L"
+	]
+}

@@ -1,0 +1,6 @@
+{
+	"primary_entity": "minecraft:enderman",
+	"script": [
+		"spawnParams.=$weight(0.125L).=$count(1)"
+	]
+}

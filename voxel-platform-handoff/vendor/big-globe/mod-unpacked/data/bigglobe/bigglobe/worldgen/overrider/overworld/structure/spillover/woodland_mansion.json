@@ -1,0 +1,11 @@
+{
+	"type": "structure",
+	"script": {
+		"template": "bigglobe:restrict_to_biome",
+		"inputs": {
+			"STRUCTURE": "'minecraft:mansion'",
+			"BIOMES":    "'#bigglobe:spillover/woodland_mansion'",
+			"PADDING":   "64"
+		}
+	}
+}

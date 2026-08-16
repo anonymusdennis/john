@@ -1,0 +1,9 @@
+{
+	"type": "group",
+	"dispatchers": [
+		"bigglobe:overworld/in_terrain",
+		"bigglobe:overworld/large_features",
+		"bigglobe:overworld/medium_features",
+		"bigglobe:overworld/small_features"
+	]
+}

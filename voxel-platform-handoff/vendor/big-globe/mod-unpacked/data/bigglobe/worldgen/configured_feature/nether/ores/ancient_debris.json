@@ -1,0 +1,19 @@
+{
+	"type": "bigglobe:script",
+	"config": {
+		"script": [
+			"(",
+				"getBlockState(originX,     originY,     originZ    ).isIn('#minecraft:base_stone_nether') &&",
+				"getBlockState(originX,     originY - 1, originZ    ).hasFullCubeOutline() &&",
+				"getBlockState(originX,     originY + 1, originZ    ).hasFullCubeOutline() &&",
+				"getBlockState(originX - 1, originY,     originZ    ).hasFullCubeOutline() &&",
+				"getBlockState(originX + 1, originY,     originZ    ).hasFullCubeOutline() &&",
+				"getBlockState(originX,     originY,     originZ - 1).hasFullCubeOutline() &&",
+				"getBlockState(originX,     originY,     originZ + 1).hasFullCubeOutline()",
+			")",
+			".if (",
+				"setBlockState(originX, originY, originZ, 'minecraft:ancient_debris')",
+			")"
+		]
+	}
+}

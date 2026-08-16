@@ -1,0 +1,16 @@
+{
+	"type": "bigglobe:script",
+	"config": {
+		"script": [
+			"int y = 0",
+			"block (",
+				"unless (isYLevelValid(y): return(false))",
+				"else if (getBlockState(0, y - 1, 0).isReplaceable(): --y,, continue())",
+			")",
+			"unless (BlockState state = getBlockState(0, y, 0),, state.getBlock() ==. 'minecraft:snow' || state.hasLava():",
+				"return(placeBlockState(0, y, 0, 'bigglobe:flint[waterlogged=false]'))",
+			")",
+			"return(false)"
+		]
+	}
+}

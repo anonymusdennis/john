@@ -4,6 +4,7 @@ URLs for materials a **smart AI cannot fetch**. A human with network access shou
 
 ```bash
 ./voxel-platform-handoff/scripts/fetch_big_globe_refs.sh
+./voxel-platform-handoff/scripts/fetch_mod.sh
 ```
 
 Or download items manually below.

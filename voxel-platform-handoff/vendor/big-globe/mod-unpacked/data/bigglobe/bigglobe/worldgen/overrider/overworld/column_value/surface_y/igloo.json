@@ -1,0 +1,24 @@
+{
+	"type": "column_value",
+	"script": {
+		"source": [
+			"for (StructureStart start in structures:",
+				"StructurePiece last = start.pieces.(start.pieces.size - 1)",
+				"double distance = distanceToCircle(last, 6.0L)",
+				"if (distance < 12.0L:",
+					"double mixLevel = smooth(distance / 12.0L)",
+					"setSurfaceY(last.minY - 0.5L, mixLevel, keepSnow)",
+					"setSnowY(last.minY + 1.0625L, mixLevel)",
+					"setSurfaceFoliage(last.minY, mixLevel)",
+				")",
+			")"
+		],
+		"includes": [
+			"bigglobe:include/surface_manipulation"
+		]
+	},
+	"structure_filter": {
+		"structure": "minecraft:igloo",
+		"radius_in_chunks": 1
+	}
+}

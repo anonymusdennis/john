@@ -1,0 +1,18 @@
+{
+	"type": "bigglobe:script",
+	"biomes": "#bigglobe:has_structure/core_spire",
+	"spawn_overrides": {},
+	"step": "underground_structures",
+	"layout": [
+		"int originY = world_traits.`bigglobe:lava_y`(originX, originZ)",
+		"pieces.add(",
+			"ScriptStructurePiece.new(",
+				"-4, -4, -4, 4, 24, 4,",
+				"'bigglobe:core_spire',",
+				"nbtCompound()",
+			")",
+			".symmetrify(Symmetry.randomRotation())",
+			".offset(originX, originY, originZ)",
+		")"
+	]
+}

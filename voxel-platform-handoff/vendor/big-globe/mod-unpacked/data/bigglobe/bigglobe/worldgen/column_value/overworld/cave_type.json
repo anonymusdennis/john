@@ -1,0 +1,9 @@
+{
+	"type": "decision_tree",
+	"params": {
+		"type": "bigglobe:cave_systems/base/class",
+		"is_3d": false
+	},
+	"has_border": true,
+	"root": "bigglobe:overworld/cave_type/test_ocean"
+}

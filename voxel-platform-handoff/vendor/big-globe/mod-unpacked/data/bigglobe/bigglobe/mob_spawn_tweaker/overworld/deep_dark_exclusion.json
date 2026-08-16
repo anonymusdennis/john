@@ -1,0 +1,8 @@
+{
+	"order": 1000,
+	"script": [
+		"if (y < world_traits.`bigglobe:deep_dark_max_y`:",
+			"spawnMap.clear()",
+		")"
+	]
+}

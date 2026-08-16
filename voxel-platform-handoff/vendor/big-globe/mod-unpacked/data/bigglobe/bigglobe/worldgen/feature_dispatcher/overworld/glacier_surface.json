@@ -1,0 +1,20 @@
+{
+	"type": "script",
+	"dispatcher": [
+		"double magicalness = world_traits.`bigglobe:magicalness`(minModifiableX | 8, minModifiableZ | 8)",
+		"double innerness = `bigglobe:overworld/glacier_crack_threshold`(minModifiableX | 8, minModifiableZ | 8) - 1.0L",
+		"if (magicalness < 0.0L && innerness > 0.0L:",
+			"innerness = 1.0L - 0.25L / (innerness ^ 2 + 0.25L)",
+			"repeat (random.roundInt(magicalness ^ 2 * innerness):",
+				"int*(",
+					"x = minModifiableX | random.nextInt(16)",
+					"z = minModifiableZ | random.nextInt(16)",
+					"y = floorInt(`bigglobe:overworld/glacier_max_y`(x, z))",
+				")",
+				"if (world_traits.`bigglobe:y_level_on_surface`(x, z) < y:",
+					"placeFeature(x, y, z, 'bigglobe:overworld/ice_spike')",
+				")",
+			")",
+		")"
+	]
+}

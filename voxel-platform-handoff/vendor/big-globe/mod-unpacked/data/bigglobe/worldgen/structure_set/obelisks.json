@@ -1,0 +1,29 @@
+{
+	"placement": {
+		"type": "bigglobe:script",
+		"script": [
+			"for (",
+				"int regionZ in range[regionMinZ / 16384, regionMaxZ / 16384],",
+				"int regionX in range[regionMinX / 16384, regionMaxX / 16384]",
+			":",
+				"int blockX  = regionX * 16384",
+				"int blockZ  = regionZ * 16384",
+				"int count   = `bigglobe:overworld/obelisk_group_count`(blockX, blockZ)",
+				"int centerX = `bigglobe:overworld/obelisk_group_center_x`(blockX, blockZ)",
+				"int centerZ = `bigglobe:overworld/obelisk_group_center_z`(blockX, blockZ)",
+				"double startAngle = `bigglobe:overworld/obelisk_group_angle`(blockX, blockZ)",
+				"double radius = `bigglobe:overworld/obelisk_group_radius`(blockX, blockZ)",
+				"for (int index in range[0, count):",
+					"double angle = double(index) / double(count) * tau + startAngle",
+					"int newX = centerX + int(cos(angle) * radius)",
+					"int newZ = centerZ + int(sin(angle) * radius)",
+					"StructureStart start = createStartNear(newX, 0, newZ, 'bigglobe:obelisk')",
+					"if (start.?override(): starts.add(start))",
+				")",
+			")"
+		]
+	},
+	"structures": [
+		{ "structure": "bigglobe:obelisk", "weight": 1 }
+	]
+}

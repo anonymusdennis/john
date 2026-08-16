@@ -1,0 +1,17 @@
+{
+	"type": "minecraft:crafting_shaped",
+	"group": "wooden_sign",
+	"pattern": [
+		"ppp",
+		"ppp",
+		" s "
+	],
+	"key": {
+		"p": "bigglobe:charred_planks",
+		"s": "minecraft:stick"
+	},
+	"result": {
+		"count": 3,
+		"id": "bigglobe:charred_sign"
+	}
+}

@@ -1,0 +1,10 @@
+{
+	"type": "bigglobe:script",
+	"config": {
+		"script": [
+			"SplitTreeGenerator",
+			".create(world, random, 'minecraft:flowering_azalea')",
+			".placeNatural(originX, originY, originZ)"
+		]
+	}
+}

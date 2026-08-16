@@ -1,0 +1,12 @@
+{
+	"replace": false,
+	"values": [
+		"bigglobe:overworld/desert",
+		"bigglobe:overworld/mesa",
+		"bigglobe:overworld/plains",
+		"bigglobe:overworld/forest",
+		"bigglobe:overworld/icy_forest",
+		"bigglobe:overworld/icy_plains",
+		"bigglobe:overworld/mountain"
+	]
+}

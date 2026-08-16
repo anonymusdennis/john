@@ -1,0 +1,19 @@
+{
+	"type": "column_value",
+	"script": {
+		"source": [
+			"for (StructureStart start in structures:",
+				"double distance = distanceToSquare(start)",
+				"double mixLevel = smooth(distance * 0.015625L)",
+				"setSurfaceY(start.minY - 0.5L, mixLevel, keepSnow)",
+			")"
+		],
+		"includes": [
+			"bigglobe:include/surface_manipulation"
+		]
+	},
+	"structure_filter": {
+		"structure": "minecraft:monument",
+		"radius_in_chunks": 4
+	}
+}

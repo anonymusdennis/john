@@ -1,0 +1,13 @@
+{
+	"type": "bigglobe:script",
+	"config": {
+		"script": [
+			"if (getBlockState(0, -1, 0).isAir():",
+				"setBlockState(0, -1, 0,",
+					"BlockState('minecraft:mangrove_propagule', hanging: true, age: random.nextInt(0, 5), stage: 0, waterlogged: false)",
+				")",
+			")",
+			"return(true)"
+		]
+	}
+}

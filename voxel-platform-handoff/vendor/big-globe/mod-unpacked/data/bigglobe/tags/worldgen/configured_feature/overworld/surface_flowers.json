@@ -1,0 +1,11 @@
+{
+	"replace": false,
+	"values": [
+		"bigglobe:overworld/flowers/bushes",
+		"bigglobe:overworld/flowers/berry_bushes",
+		"bigglobe:overworld/flowers/crops",
+		"bigglobe:overworld/flowers/flowers",
+		"bigglobe:overworld/flowers/gourds",
+		"bigglobe:overworld/flowers/mushrooms"
+	]
+}

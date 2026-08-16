@@ -1,0 +1,8 @@
+{
+	"type": "bigglobe:decision_tree",
+	"params": {
+		"type": "bigglobe:surface/with_biome/class",
+		"is_3d": false
+	},
+	"root": "bigglobe:end/surface/root_test_terrain"
+}

@@ -1,0 +1,16 @@
+{
+	"type": "minecraft:crafting_shaped",
+	"pattern": [
+		"sws",
+		"sws",
+		"sws"
+	],
+	"key": {
+		"s": "#c:strings",
+		"w": "#c:rods/wooden"
+	},
+	"result": {
+		"count": 6,
+		"id": "bigglobe:spelunking_rope"
+	}
+}

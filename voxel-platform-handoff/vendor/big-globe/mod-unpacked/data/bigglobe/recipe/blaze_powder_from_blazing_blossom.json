@@ -1,0 +1,9 @@
+{
+	"type": "minecraft:crafting_shapeless",
+	"ingredients": [
+		"bigglobe:blazing_blossom"
+	],
+	"result": {
+		"id": "minecraft:blaze_powder"
+	}
+}

@@ -1,0 +1,70 @@
+{
+	"dimensions": {
+		"minecraft:overworld": {
+			"type": "bigglobe:overworld",
+			"generator": {
+				"type": "bigglobe:scripted",
+				"reload_preset": "islands",
+				"reload_dimension": "minecraft:overworld",
+				"biome_source": {
+					"type": "bigglobe:scripted",
+					"script": "`bigglobe:islands/biome`",
+					"all_possible_biomes": "#bigglobe:overworld"
+				},
+				"height": {
+					"min_y": -1024,
+					"max_y":  1024,
+					"sea_level": 0
+				},
+				"world_traits": "bigglobe:islands",
+				"layer": "bigglobe:islands/root",
+				"feature_dispatcher": {
+					"rock_replacers": [
+						"bigglobe:overworld/bedrock",
+						"bigglobe:overworld/cobblestone_sprinkle",
+						"#bigglobe:islands/ores"
+					],
+					"raw": "bigglobe:islands/raw_root",
+					"normal": "bigglobe:islands/normal_root"
+				},
+				"overriders": "#bigglobe:islands",
+				"game_mechanics": {
+					"spawn_point": {
+						"file": "bigglobe:world_preset/islands_spawn_point"
+					},
+					"colors": {
+						"grass": {
+							"source": "computeBiomeTint(false, `bigglobe:islands/is_volcano` ? unmixSmooth(1.0I, 0.75I, `bigglobe:islands/island`.softDistanceSquared.as(float)) : 0.0I)",
+							"includes": "bigglobe:include/biome_tint"
+						},
+						"foliage": {
+							"source": "computeBiomeTint(true, `bigglobe:islands/is_volcano` ? unmixSmooth(1.0I, 0.75I, `bigglobe:islands/island`.softDistanceSquared.as(float)) : 0.0I)",
+							"includes": "bigglobe:include/biome_tint"
+						},
+						"water": [
+							"double temperature = 1.0L / (fastExp(-4.0L * world_traits.`bigglobe:temperature_at`) + 1.0L)",
+							"packI(63, roundInt(temperature * 128.0L + 64.0L), 255)"
+						]
+					},
+					"grass_bonemeal_feature": "bigglobe:overworld/grass_bonemeal"
+				}
+			}
+		},
+
+		"minecraft:the_nether": {
+			"type": "bigglobe:nether",
+			"generator": {
+				"type": "bigglobe:scripted",
+				"reload_dimension": "minecraft:the_nether"
+			}
+		},
+
+		"minecraft:the_end": {
+			"type": "bigglobe:end",
+			"generator": {
+				"type": "bigglobe:scripted",
+				"reload_dimension": "minecraft:the_end"
+			}
+		}
+	}
+}

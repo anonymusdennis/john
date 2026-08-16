@@ -1,0 +1,34 @@
+{
+	"type": "bigglobe:script",
+	"biomes": "#bigglobe:has_structure/soul_campfire",
+	"spawn_overrides": {},
+	"step": "surface_structures",
+	"layout": [
+		"ColumnStorage column = columnAt(originX, originZ)",
+		"boolean isTerrainAt(int y:",
+			"return(column.`bigglobe:nether/noise`(y) > 0.5I)",
+		")",
+
+		"int getY(:",
+			"repeat (16:",
+				"int y = random.nextInt(`bigglobe:nether/min_y`, `bigglobe:nether/max_y`)",
+				"unless (isTerrainAt(y):",
+					"do until (isTerrainAt(y):",
+						"if (:-- y < `bigglobe:nether/bubble_type`(originX, originZ).lavaLevel: return(16x8000_0000U))",
+					")",
+					"return(y + 1)",
+				")",
+			")",
+			"return(16x8000_0000U)",
+		")",
+
+		"int y = getY()",
+		"unless (y == 16x8000_0000U:",
+			"pieces.add(ScriptStructurePiece.new(",
+				"originX - 4, y - 1, originZ - 4, originX + 4, y, originZ + 4,",
+				"'bigglobe:soul_campfire',",
+				"nbtCompound()",
+			"))",
+		")"
+	]
+}

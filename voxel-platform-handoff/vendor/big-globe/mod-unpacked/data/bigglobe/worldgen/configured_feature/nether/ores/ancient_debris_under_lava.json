@@ -1,0 +1,15 @@
+{
+	"type": "bigglobe:script",
+	"config": {
+		"script": [
+			"int y = min(",
+				"random.nextInt(`bigglobe:nether/min_y`, world_traits.`bigglobe:lava_y`),",
+				"random.nextInt(`bigglobe:nether/min_y`, world_traits.`bigglobe:lava_y`)",
+			")",
+			"return (",
+				"y.isBetween[minValidYLevel, maxValidYLevel) &&",
+				"placeFeature(originX, y, originZ, 'bigglobe:nether/ores/ancient_debris')",
+			")"
+		]
+	}
+}

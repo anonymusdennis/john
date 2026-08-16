@@ -1,0 +1,19 @@
+{
+	"type": "bigglobe:script",
+	"config": {
+		"script": [
+			"BlockState state = 'minecraft:cactus[age=0]'",
+			"unless (state.canPlaceAt(originX, originY, originZ): return(false))",
+			"int maxHeight = random.nextInt(1, 5)",
+			"for (int height = 0, height <= maxHeight && state.canPlaceAt(originX, originY + height, originZ), ++height:",
+				"setBlockState(originX, originY + height, originZ, state)",
+			")",
+			"if (BlockState*(flower := BlockState?('minecraft:cactus_flower')) != null:",
+				"random.if (0.25I:",
+					"placeBlockState(originX, originY + maxHeight + 1, originZ, flower)",
+				")",
+			")",
+			"return(true)"
+		]
+	}
+}

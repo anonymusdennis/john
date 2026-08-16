@@ -1,0 +1,13 @@
+{
+	"placement": {
+		"type": "minecraft:random_spread",
+		"salt": 0,
+		"separation": 0,
+		"spacing": 1
+	},
+	"structures": [
+		{ "weight": 1, "structure": "bigglobe:nether_pillars/normal" },
+		{ "weight": 1, "structure": "bigglobe:nether_pillars/extra"  },
+		{ "weight": 1, "structure": "bigglobe:nether_pillars/broken" }
+	]
+}

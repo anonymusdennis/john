@@ -1,0 +1,10 @@
+{
+	"type": "group",
+	"dispatchers": [
+		"bigglobe:islands/lava_tick_scheduler",
+		"bigglobe:islands/in_terrain",
+		"bigglobe:islands/large_features",
+		"bigglobe:islands/medium_features",
+		"bigglobe:islands/small_features"
+	]
+}

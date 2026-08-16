@@ -1,0 +1,9 @@
+{
+	"type": "minecraft:crafting_shapeless",
+	"ingredients": [
+		"bigglobe:ash"
+	],
+	"result": {
+		"id": "minecraft:black_dye"
+	}
+}

@@ -1,0 +1,40 @@
+{
+	"type": "bigglobe:script",
+	"config": {
+		"script": [
+			"if (noscope(int y := world_traits.`bigglobe:lava_y`).isBetween[minValidYLevel, maxValidYLevel):",
+				"placeFeature(originX, y, originZ, 'bigglobe:nether/decorators/lava_soul')",
+			")",
+			"for (int baseY in range[minValidYLevel, maxValidYLevel) % 32:",
+				"int y = baseY | (worldSeed # 16x5EBDEDC4EE513888UL).newSeed(placementX, placementZ, baseY).nextInt(32)",
+				"BlockState originState = getBlockState(originX, y, originZ)",
+				"if (originState.isAir():",
+					"if (getBlockState(originX, y - 1, originZ) ==. 'minecraft:soul_sand':",
+						"random.if (1.0I / 128.0I:",
+							"placeFeature(originX, y, originZ, 'bigglobe:nether/flowers/valley_of_souls')",
+						")",
+						"random.if (1.0I / 256.0I:",
+							"placeFeature(originX, y, originZ, 'bigglobe:nether/flowers/soul_fire')",
+						")",
+						"random.if (0.25I:",
+							"placeFeature(originX, y, originZ, 'bigglobe:nether/grass/valley_of_souls')",
+						")",
+					")",
+					"else if (getBlockState(originX, y + 1, originZ).isIn('#bigglobe:valley_of_souls_base_blocks'):",
+						"random.if (",
+							"unmixSmooth(",
+								"double(`bigglobe:nether/mid_y` - `bigglobe:nether/cavern_fade_radius`),",
+								"double(`bigglobe:nether/mid_y` + `bigglobe:nether/cavern_fade_radius`),",
+								"double(y)",
+							")",
+							"* 0.25L",
+						":",
+							"placeFeature(originX, y, originZ, 'bigglobe:nether/chain')",
+						")",
+					")",
+				")",
+			")",
+			"true"
+		]
+	}
+}

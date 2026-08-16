@@ -1,0 +1,17 @@
+{
+	"type": "minecraft:crafting_shaped",
+	"pattern": [
+		"c",
+		"s",
+		"f"
+	],
+	"key": {
+		"c": "#bigglobe:coal_crafting_materials",
+		"s": "#c:rods/wooden",
+		"f": "#c:feathers"
+	},
+	"result": {
+		"count": 4,
+		"id": "bigglobe:torch_arrow"
+	}
+}

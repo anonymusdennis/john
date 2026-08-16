@@ -1,0 +1,27 @@
+{
+	"type": "noise",
+	"params": {
+		"type": "float",
+		"is_3d": true
+	},
+	"grid": {
+		"type": "script",
+		"min": 0.125,
+		"max": 1.0,
+		"script": "1.0L - abs(shape)",
+		"inputs": {
+			"shape": {
+				"type": "sum",
+				"layers": [
+					{ "type": "smooth", "scale": 32, "amplitude": 0.5 },
+					{ "type": "smooth", "scale": 16, "amplitude": 0.25 },
+					{ "type": "smooth", "scale":  8, "amplitude": 0.125 }
+				]
+			}
+		}
+	},
+	"valid": {
+		"min_y": "world_traits.`bigglobe:core_min_y`",
+		"max_y": "world_traits.`bigglobe:core_max_y`"
+	}
+}

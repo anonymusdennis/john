@@ -1,0 +1,68 @@
+{
+	"type": "bigglobe:rock_layer",
+	"config": {
+		"seed": "generic",
+		"repeat": 8.0,
+		"entries": {
+			"defaults": {
+				"center": {
+					"type": "sum",
+					"layers": [
+						{ "type": "smooth", "scale": 128, "amplitude": 16.0 },
+						{ "type": "smooth", "scale":  64, "amplitude":  8.0 },
+						{ "type": "smooth", "scale":  32, "amplitude":  4.0 }
+					]
+				},
+				"thickness": {
+					"type": "sum",
+					"layers": [
+						{ "type": "smooth", "scale": 32, "amplitude": 4.0 },
+						{ "type": "smooth", "scale": 16, "amplitude": 2.0 },
+						{ "type": "smooth", "scale":  8, "amplitude": 1.0 }
+					]
+				},
+				"restrictions": {
+					"type": "script",
+					"script": "`bigglobe:nether/bubble_type`.filler ==. 'minecraft:netherrack' ? 1.0 : 0.0"
+				}
+			},
+			"variations": [
+				{
+					"weight": 1.0,
+					"blocks": {
+						"minecraft:netherrack": "minecraft:soul_sand",
+						"minecraft:crimson_nylium": "minecraft:soul_sand",
+						"minecraft:warped_nylium": "minecraft:soul_sand"
+					}
+				},
+				{
+					"weight": 1.0,
+					"blocks": {
+						"minecraft:netherrack": "minecraft:soul_soil",
+						"minecraft:crimson_nylium": "minecraft:soul_soil",
+						"minecraft:warped_nylium": "minecraft:soul_soil"
+					}
+				},
+				{
+					"weight": 0.5,
+					"blocks": {
+						"minecraft:netherrack": "minecraft:smooth_basalt"
+					}
+				},
+				{
+					"weight": 0.5,
+					"blocks": {
+						"minecraft:netherrack": "minecraft:blackstone",
+						"bigglobe:ashen_netherrack": "minecraft:blackstone"
+					}
+				},
+				{
+					"weight": 0.25,
+					"blocks": {
+						"minecraft:netherrack": "minecraft:gravel"
+					}
+				}
+			]
+		}
+	}
+}

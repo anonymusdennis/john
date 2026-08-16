@@ -1,0 +1,8 @@
+{
+	"result": {
+		"type": "script",
+		"script": [
+			"BiomeSurfaceStates.create('bigglobe:end/end_mountain')"
+		]
+	}
+}

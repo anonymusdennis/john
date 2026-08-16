@@ -1,0 +1,19 @@
+{
+	"type": "bigglobe:script",
+	"config": {
+		"script": [
+			"unless (getBlockState(0, 1, 0).hasFullCubeCollision(): return(false))",
+			"int y = 0",
+			"while (getBlockState(0, y, 0).isAir():",
+				"setBlockState(0, y, 0, 'minecraft:pale_hanging_moss[tip=false]')",
+				"--y",
+				"unless (random.nextBoolean(0.75): break())",
+			")",
+			"++y",
+			"if (getBlockState(0, y, 0) ==. 'minecraft:pale_hanging_moss[tip=false]':",
+				"setBlockState(0, y, 0, 'minecraft:pale_hanging_moss[tip=true]')",
+			")",
+			"return(true)"
+		]
+	}
+}

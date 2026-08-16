@@ -1,0 +1,11 @@
+{
+	"placement": {
+		"type": "minecraft:random_spread",
+		"salt": 493243474,
+		"separation": 5,
+		"spacing": 8
+	},
+	"structures": [
+		{ "weight": 1, "structure": "bigglobe:geodes/quartz" }
+	]
+}

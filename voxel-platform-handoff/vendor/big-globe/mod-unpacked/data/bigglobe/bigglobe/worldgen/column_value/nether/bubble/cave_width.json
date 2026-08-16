@@ -1,0 +1,9 @@
+{
+	"type": "script",
+	"params": {
+		"type": "double",
+		"is_3d": true
+	},
+	"script": "fastExp2(y / -128.0L) * 512.0L + 8.0L",
+	"cache": false
+}

@@ -1,0 +1,16 @@
+{
+	"type": "bigglobe:mega_tree",
+	"biomes": "#bigglobe:has_structure/mega_tree",
+	"spawn_overrides": {
+		"ambient": { "bounding_box": "full", "spawns": [] },
+		"monster": { "bounding_box": "full", "spawns": [] }
+	},
+	"step": "surface_structures",
+	"palette":         "world_traits.`bigglobe:wood_palette`",
+	"size":            "mixLinear(64.0L, 384.0L, world_traits.`bigglobe:foliage_at_surface`)",
+	"trunk_radius":    "mixLinear( 2.0L,  12.0L, world_traits.`bigglobe:foliage_at_surface`)",
+	"branch_sparsity": "mixLinear( 4.0L,   8.0L, world_traits.`bigglobe:foliage_at_surface`)",
+	"surface_y":       "world_traits.`bigglobe:y_level_in_surface`",
+	"snow_chance":     "world_traits.`bigglobe:snow_chance`",
+	"max_radius_in_chunks": 12
+}

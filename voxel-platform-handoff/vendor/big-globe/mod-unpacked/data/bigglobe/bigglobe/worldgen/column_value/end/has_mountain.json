@@ -1,0 +1,9 @@
+{
+	"type": "script",
+	"params": {
+		"type": "boolean",
+		"is_3d": false
+	},
+	"script": "mountain_max_y > mountain_min_y",
+	"cache": false
+}

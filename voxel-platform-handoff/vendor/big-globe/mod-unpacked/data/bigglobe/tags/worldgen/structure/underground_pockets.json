@@ -1,0 +1,9 @@
+{
+	"replace": false,
+	"values": [
+		"bigglobe:underground_pockets/water",
+		"bigglobe:underground_pockets/lava",
+		"bigglobe:underground_pockets/nether_lava",
+		"bigglobe:underground_pockets/nether_soul_lava"
+	]
+}

@@ -1,13 +1,46 @@
 {
   "source": "https://github.com/Builderb0y/BigGlobe",
-  "branch": "scriptable-generators",
-  "status": "not_fetched",
-  "note": "Run ../scripts/fetch_big_globe_refs.sh from repo root to populate this directory.",
-  "expected_files_after_fetch": [
-    "List of features.md",
-    "LICENSE.txt",
+  "docs_branch": "scriptable-generators",
+  "mod_release": {
+    "tag": "V6.1.2",
+    "jar": "Big.Globe-6.1.2-MC26.1.2.jar",
+    "minecraft_version": "26.1.2",
+    "path": "release/Big.Globe-6.1.2-MC26.1.2.jar",
+    "unpacked_path": "mod-unpacked/",
+    "globescript_files": 17,
+    "worldgen_json_files": 1800
+  },
+  "fetched_by": [
+    "fetch_big_globe_refs.sh",
+    "manual curl + unzip (fetch_mod.sh)"
+  ],
+  "docs_files": [
     "GUIDELINES.md",
+    "LICENSE.txt",
+    "List of features.md",
     "README.md",
+    "docs/common/ColumnRestriction.md",
+    "docs/common/RandomSource.md",
+    "docs/files/data/modid/bigglobe_custom_classes/ElementSpec.md",
+    "docs/files/data/modid/bigglobe_noise_sources/Grids.md",
+    "docs/files/data/modid/recipes/Scripted Recipes.md",
+    "docs/files/data/modid/worldgen/bigglobe_column_value/AccessSchema.md",
+    "docs/files/data/modid/worldgen/bigglobe_column_value/ColumnEntry.md",
+    "docs/files/data/modid/worldgen/bigglobe_column_value/ColumnValueType.md",
+    "docs/files/data/modid/worldgen/bigglobe_column_value/Valid.md",
+    "docs/files/data/modid/worldgen/bigglobe_decision_tree/Decision Trees.md",
+    "docs/files/data/modid/worldgen/bigglobe_feature_dispatchers/Feature Dispatchers.md",
+    "docs/files/data/modid/worldgen/bigglobe_layers/Layers.md",
+    "docs/files/data/modid/worldgen/bigglobe_voronoi_options/VoronoiOptions.md",
+    "docs/files/data/modid/worldgen/bigglobe_voronoi_settings/Voronoi Settings.md",
+    "docs/files/data/modid/worldgen/bigglobe_world_trait_impl/Implementing World Traits.md",
+    "docs/files/data/modid/worldgen/bigglobe_world_traits/World Traits.md",
+    "docs/files/data/modid/worldgen/configured_feature/Ores.md",
+    "docs/files/data/modid/worldgen/configured_feature/Rock Layers.md",
+    "docs/files/data/modid/worldgen/configured_feature/Scripted Configured Features.md",
+    "docs/files/data/modid/worldgen/world_preset/Empty Chunk Generators.md",
+    "docs/files/data/modid/worldgen/world_preset/Layers.md",
+    "docs/files/data/modid/worldgen/world_preset/Scripted Chunk Generators.md",
     "docs/readme.md",
     "docs/scripting/0 - Low level text format.md",
     "docs/scripting/1 - Basic syntax.md",
@@ -15,9 +48,25 @@
     "docs/scripting/3 - Quirks.md",
     "docs/scripting/4 - Optimizations.md",
     "docs/scripting/5 - Templates.md",
-    "docs/files/",
-    "docs/common/",
-    "docs/tutorials/"
+    "docs/scripting/environments/BaseColumnScriptEnvironment.md",
+    "docs/scripting/environments/ColorScriptEnvironment.md",
+    "docs/scripting/environments/ColumnEntryRegistry.md",
+    "docs/scripting/environments/CraftingGridScriptEnvironment.md",
+    "docs/scripting/environments/GridScriptEnvironment.md",
+    "docs/scripting/environments/ItemScriptEnvironment.md",
+    "docs/scripting/environments/MathScriptEnvironment.md",
+    "docs/scripting/environments/MinecraftScriptEnvironment.md",
+    "docs/scripting/environments/RandomScriptEnvironment.md",
+    "docs/scripting/environments/StatelessRandomScriptEnvironment.md",
+    "docs/scripting/environments/TraitManager.md",
+    "docs/scripting/environments/template (ignore this).md",
+    "docs/tutorials/Structures.md"
   ],
-  "files": []
+  "mod_key_paths": [
+    "mod-unpacked/data/bigglobe/worldgen/",
+    "mod-unpacked/data/bigglobe/bigglobe/script_file/",
+    "mod-unpacked/assets/",
+    "mod-unpacked/builderb0y/"
+  ],
+  "license": "All Rights Reserved — reference only, do not redistribute"
 }

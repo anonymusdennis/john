@@ -1,0 +1,29 @@
+{
+	"type": "structure",
+	"script": [
+		"if (start.structure.type ==. 'bigglobe:geode':",
+			"int minY = `bigglobe:nether/min_y`(start.midX, start.midZ) + 16",
+			"int maxY = `bigglobe:nether/max_y`(start.midX, start.midZ) - 16 - start.sizeY",
+			"if (maxY > minY:",
+				"repeat (16:",
+					"int y = random.nextInt(minY, maxY)",
+					"if (",
+						"`bigglobe:nether/noise`(start.minX, y              , start.minZ) > 0.5 &&",
+						"`bigglobe:nether/noise`(start.minX, y + start.sizeY, start.minZ) > 0.5 &&",
+						"`bigglobe:nether/noise`(start.minX, y              , start.maxZ) > 0.5 &&",
+						"`bigglobe:nether/noise`(start.minX, y + start.sizeY, start.maxZ) > 0.5 &&",
+						"`bigglobe:nether/noise`(start.maxX, y              , start.minZ) > 0.5 &&",
+						"`bigglobe:nether/noise`(start.maxX, y + start.sizeY, start.minZ) > 0.5 &&",
+						"`bigglobe:nether/noise`(start.maxX, y              , start.maxZ) > 0.5 &&",
+						"`bigglobe:nether/noise`(start.maxX, y + start.sizeY, start.maxZ) > 0.5",
+					":",
+						"start.move(y - start.minY)",
+						"return(true)",
+					")",
+				")",
+			")",
+			"return(false)",
+		")",
+		"return(true)"
+	]
+}

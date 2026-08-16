@@ -1,0 +1,14 @@
+{
+	"type": "structure",
+	"script": [
+		"if (start.structure ==. 'minecraft:igloo':",
+			"StructurePiece last = start.pieces.(start.pieces.size - 1)",
+			"int centerX = last.midX",
+			"int centerZ = last.midZ",
+			"int fromY = last.minY",
+			"int toY = int(world_traits.`bigglobe:snow_y`(centerX, centerZ) ?: return(false) - 0.5L)",
+			"start.move(toY - fromY)",
+		")",
+		"return(true)"
+	]
+}

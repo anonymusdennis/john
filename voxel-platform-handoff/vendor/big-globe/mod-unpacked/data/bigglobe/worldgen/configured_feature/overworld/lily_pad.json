@@ -1,0 +1,10 @@
+{
+	"type": "bigglobe:script",
+	"config": {
+		"script": [
+			"random.nextBoolean(1.0I / 64.0I) && (",
+				"placeBlockState(originX, originY, originZ, 'minecraft:lily_pad')",
+			")"
+		]
+	}
+}

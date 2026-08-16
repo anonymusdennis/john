@@ -1,0 +1,10 @@
+{
+	"type": "bigglobe:script",
+	"config": {
+		"script": [
+			"MangroveTreeGenerator",
+			".create(world, random, 'minecraft:mangrove')",
+			".placeNatural(originX, originY, originZ)"
+		]
+	}
+}

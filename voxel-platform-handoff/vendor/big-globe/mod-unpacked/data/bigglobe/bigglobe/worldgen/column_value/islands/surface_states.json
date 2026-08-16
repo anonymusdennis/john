@@ -1,0 +1,8 @@
+{
+	"type": "bigglobe:decision_tree",
+	"params": {
+		"type": "bigglobe:surface/multi/class",
+		"is_3d": false
+	},
+	"root": "bigglobe:islands/surface_state/test_beach"
+}

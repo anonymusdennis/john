@@ -1,0 +1,34 @@
+{
+	"condition": {
+		"type": "and",
+		"conditions": [
+			{
+				"type": "curve_range",
+				"value": {
+					"type": "world_trait",
+					"world_trait": "bigglobe:exact_surface_y"
+				},
+				"min": 2.0,
+				"max": 6.0
+			},
+			{
+				"type": "curve_range",
+				"value": {
+					"type": "world_trait",
+					"world_trait": "bigglobe:temperature_at_surface"
+				},
+				"min": 0.125,
+				"max": 0.0625
+			},
+			{
+				"type": "not",
+				"condition": {
+					"type": "world_trait",
+					"world_trait": "bigglobe:in_river"
+				}
+			}
+		]
+	},
+	"if_true": "bigglobe:overworld/surface_state/overgrown_beach",
+	"if_false": "bigglobe:overworld/surface_state/beach"
+}

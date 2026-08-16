@@ -1,0 +1,8 @@
+{
+	"result": {
+		"type": "script",
+		"script": [
+			"BiomeSurfaceStates.create('bigglobe:end/overgrown_end').$add('bigglobe:overgrown_end_stone', 1)"
+		]
+	}
+}

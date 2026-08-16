@@ -1,0 +1,19 @@
+{
+	"type": "script",
+	"params": {
+		"type": "double",
+		"is_3d": false
+	},
+	"script": [
+		"float t = world_traits.`bigglobe:temperature_at_surface`",
+		"mixLinear(",
+			"world_traits.`bigglobe:exact_surface_y`,",
+			"eroded_snow.y + (t * -32.0I - 4.0I),",
+			"unmixSmooth(",
+				"world_traits.`bigglobe:sea_level`,",
+				"world_traits.`bigglobe:sea_level` + 32.0L,",
+				"world_traits.`bigglobe:exact_surface_y`",
+			")",
+		")"
+	]
+}

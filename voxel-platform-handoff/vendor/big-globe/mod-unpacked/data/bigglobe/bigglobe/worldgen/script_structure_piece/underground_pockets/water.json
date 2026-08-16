@@ -1,0 +1,11 @@
+{
+	"raw_placement": {
+		"template": "bigglobe:underground_pocket_fill_with_fluid",
+		"inputs": {
+			"FLUID_STATE": "'minecraft:water[level=0]'",
+			"SURFACE_FIND": "'#bigglobe:rock_placeable_on_worldgen'",
+			"SURFACE_REPLACE": "'minecraft:clay'"
+		}
+	},
+	"placement": "noop"
+}

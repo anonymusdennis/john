@@ -1,0 +1,11 @@
+{
+	"element_type": "field/enum",
+	"owner": "bigglobe:cave_systems/base/class",
+	"impl_type": "bigglobe:cave_systems/dripping_flooded/class",
+	"name": "DRIPPING_FLOODED",
+	"field_values": {
+		"decorator": "bigglobe:overworld/caves/dripping_decorator",
+		"carverBlockState": "minecraft:water[level=0]",
+		"systemDepth": 512
+	}
+}

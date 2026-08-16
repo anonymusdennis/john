@@ -1,0 +1,83 @@
+{
+	"type": "bigglobe:flower",
+	"config": {
+		"seed": "mushrooms",
+		"distance": 32,
+		"variation": 32,
+		"spawn_chance": 0.5,
+		"randomize_chance": 0.25,
+		"randomize_radius": { "type": "uniform", "min": 16.0, "max": 32.0 },
+		"noise": {
+			"type": "abs",
+			"grid": {
+				"type": "sum",
+				"layers": [
+					{ "type": "smooth", "scale": 32, "amplitude": 0.25 },
+					{ "type": "smooth", "scale": 16, "amplitude": 0.25 },
+					{ "type": "smooth", "scale":  8, "amplitude": 0.25 },
+					{ "type": "smooth", "scale":  4, "amplitude": 0.25 }
+				]
+			}
+		},
+		"entries": [
+			{
+				"weight": 100.0,
+				"restrictions": {
+					"type": "and",
+					"restrictions": [
+						{
+							"type": "threshold",
+							"property": "bigglobe:overworld/foliage",
+							"min": 0.0,
+							"max": 0.5
+						},
+						{
+							"type": "range",
+							"property": "bigglobe:overworld/temperature",
+							"min": -0.5,
+							"mid":  0.375,
+							"max":  0.5
+						},
+						{
+							"type": "threshold",
+							"property": "bigglobe:overworld/magicalness",
+							"min":  1.0,
+							"max": -1.0
+						}
+					]
+				},
+				"radius": { "type": "uniform", "min": 16.0, "max": 32.0 },
+				"state": "minecraft:red_mushroom"
+			},
+			{
+				"weight": 100.0,
+				"restrictions": {
+					"type": "and",
+					"restrictions": [
+						{
+							"type": "threshold",
+							"property": "bigglobe:overworld/foliage",
+							"min": 0.0,
+							"max": 0.5
+						},
+						{
+							"type": "range",
+							"property": "bigglobe:overworld/temperature",
+							"min": -0.5,
+							"mid": -0.375,
+							"max":  0.5
+						},
+						{
+							"type": "threshold",
+							"property": "bigglobe:overworld/magicalness",
+							"min":  1.0,
+							"max": -1.0
+						}
+					]
+				},
+				"radius": { "type": "uniform", "min": 16.0, "max": 32.0 },
+				"state": "minecraft:brown_mushroom"
+			}
+		]
+	}
+}

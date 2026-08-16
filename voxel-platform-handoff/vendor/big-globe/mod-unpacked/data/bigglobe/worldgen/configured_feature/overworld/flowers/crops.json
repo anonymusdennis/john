@@ -1,0 +1,76 @@
+{
+	"type": "bigglobe:flower",
+	"config": {
+		"seed": "crops",
+		"distance": 64,
+		"variation": 64,
+		"spawn_chance": 0.125,
+		"randomize_chance": 0.125,
+		"randomize_radius": { "type": "uniform", "min": 24.0, "max": 48.0 },
+		"noise": {
+			"type": "abs",
+			"grid": {
+				"type": "sum",
+				"layers": [
+					{ "type": "smooth", "scale": 32, "amplitude": 0.25 },
+					{ "type": "smooth", "scale": 16, "amplitude": 0.25 },
+					{ "type": "smooth", "scale":  8, "amplitude": 0.25 },
+					{ "type": "smooth", "scale":  4, "amplitude": 0.25 }
+				]
+			}
+		},
+		"entries": {
+			"defaults": {
+				"radius": { "type": "uniform", "min": 24.0, "max": 48.0 },
+				"restrictions": {
+					"type": "and",
+					"restrictions": [
+						{
+							"type": "range",
+							"property": "bigglobe:overworld/foliage",
+							"min": -0.5,
+							"mid":  0.0,
+							"max":  0.5
+						},
+						{
+							"type": "range",
+							"property": "bigglobe:overworld/temperature",
+							"min": -0.5,
+							"mid":  0.0,
+							"max":  0.5
+						},
+						{
+							"type": "threshold",
+							"property": "bigglobe:overworld/hilliness",
+							"min":  0.5,
+							"max":  0.0,
+							"smooth_max": false
+						},
+						{
+							"type": "threshold",
+							"property": "bigglobe:overworld/magicalness",
+							"min": -0.5,
+							"max":  0.0
+						}
+					]
+				},
+				"under": {
+					"place": "minecraft:farmland",
+					"replace": [
+						"minecraft:dirt",
+						"minecraft:coarse_dirt",
+						"minecraft:grass_block",
+						"minecraft:podzol",
+						"bigglobe:overgrown_podzol"
+					]
+				}
+			},
+			"variations": [
+				{ "weight": 20.0, "state": "minecraft:wheat"     },
+				{ "weight": 10.0, "state": "minecraft:carrots"   },
+				{ "weight": 10.0, "state": "minecraft:potatoes"  },
+				{ "weight":  5.0, "state": "minecraft:beetroots" }
+			]
+		}
+	}
+}

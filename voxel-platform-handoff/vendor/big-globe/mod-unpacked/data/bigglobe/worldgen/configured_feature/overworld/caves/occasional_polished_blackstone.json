@@ -1,0 +1,14 @@
+{
+	"type": "bigglobe:script",
+	"config": {
+		"script": [
+			"int y = 0",
+			"while (getBlockState(0, :--y, 0) ==. 'minecraft:blackstone':",
+				"random.if (0.125:",
+					"setBlockState(0, y, 0, 'minecraft:polished_blackstone')",
+				")",
+			")",
+			"return(true)"
+		]
+	}
+}

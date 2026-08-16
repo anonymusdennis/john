@@ -1,0 +1,12 @@
+{
+	"type": "bigglobe:script",
+	"config": {
+		"script": {
+			"debug_name": "ConfiguredFeatureSculkPatch",
+			"template": "bigglobe:sculk_patch_feature",
+			"inputs": {
+				"spreads": "min(random.nextInt(16, 256), random.nextInt(16, 256))"
+			}
+		}
+	}
+}

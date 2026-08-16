@@ -1,0 +1,32 @@
+{
+	"type": "bigglobe:script",
+	"biomes": "#bigglobe:has_structure/well",
+	"spawn_overrides": {},
+	"step": "surface_structures",
+	"layout": [
+		"int originY = world_traits.`bigglobe:y_level_on_surface`",
+		"WoodPalette palette = `bigglobe:overworld/wood_palette`",
+		"Biome biome = `bigglobe:overworld/biome`(originY)",
+
+		"int type = 0",
+		"if (biome.isIn('#bigglobe:deserts'):",
+			"if (biome ==. 'bigglobe:overworld/mesa':",
+				"type = 2",
+				"palette = null",
+			")",
+			"else (",
+				"type = 1",
+			")",
+		")",
+		"random.if (palette = null)",
+
+		"pieces.add(ScriptStructurePiece.new(",
+			"originX - 2, originY - random.nextInt(8, 24), originZ - 2, originX + 2, originY + 4, originZ + 2,",
+			"'bigglobe:well',",
+			"nbtCompound(",
+				"palette: palette.?id,",
+				"type: type",
+			")",
+		"))"
+	]
+}

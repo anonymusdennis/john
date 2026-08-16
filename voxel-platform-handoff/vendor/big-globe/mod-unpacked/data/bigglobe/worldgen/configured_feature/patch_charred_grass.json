@@ -1,0 +1,17 @@
+{
+	"type": "bigglobe:script",
+	"config": {
+		"script": [
+			"boolean placedAny = false",
+			"repeat (32:",
+				"placedAny |= placeBlockState(",
+					"originX + random.nextInt(7) - random.nextInt(7),",
+					"originY + random.nextInt(3) - random.nextInt(3),",
+					"originZ + random.nextInt(7) - random.nextInt(7),",
+					"'bigglobe:charred_grass'",
+				")",
+			")",
+			"return(placedAny)"
+		]
+	}
+}

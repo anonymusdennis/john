@@ -1,0 +1,12 @@
+{
+	"type": "bigglobe:script",
+	"params": {
+		"type": "double",
+		"is_3d": false
+	},
+	"script": [
+		"double wave = fastSin((warp_angle + fastLog2(warp_radius)) * 8.0L)",
+		"double amplitude = warp_radius * fastExp2(-4.0L * warp_radius)",
+		"return(wave * amplitude)"
+	]
+}

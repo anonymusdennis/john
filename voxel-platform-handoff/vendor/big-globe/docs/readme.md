@@ -1,0 +1,1 @@
+For information on scripting basics and language specs, see the "scripting" folder. For schemas of other json files, see the "files" folder. The "common" folder contains some schemas which are used in multiple other files.

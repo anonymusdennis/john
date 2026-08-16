@@ -1,0 +1,5 @@
+{
+	"element_type": "class/enum",
+	"name": "MushroomCaveSystem",
+	"extends": "bigglobe:cave_systems/easy/class"
+}

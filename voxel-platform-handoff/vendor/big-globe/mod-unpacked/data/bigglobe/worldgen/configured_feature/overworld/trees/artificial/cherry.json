@@ -1,0 +1,11 @@
+{
+	"type": "bigglobe:script",
+	"config": {
+		"script": [
+			"SplitTreeGenerator",
+			".create(world, random, 'minecraft:cherry')",
+			".=$requireValidGround(true)",
+			".placeNatural(originX, originY, originZ)"
+		]
+	}
+}

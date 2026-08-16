@@ -1,0 +1,8 @@
+{
+	"type": "group",
+	"dispatchers": [
+		"bigglobe:end/large_features",
+		"bigglobe:end/medium_features",
+		"bigglobe:end/small_features"
+	]
+}

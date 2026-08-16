@@ -1,0 +1,17 @@
+{
+	"type": "noise",
+	"params": {
+		"type": "double",
+		"is_3d": false
+	},
+	"seed": "rivers",
+	"grid": {
+		"type": "sum",
+		"layers": [
+			{ "type": "dx_smoother_resample", "source": { "type": "binary", "amplitude": 0.6    }, "scale": 3072 },
+			{ "type": "dx_smoother_resample", "source": { "type": "binary", "amplitude": 0.24   }, "scale": 1536 },
+			{ "type": "dx_smoother_resample", "source": { "type": "binary", "amplitude": 0.096  }, "scale":  768 },
+			{ "type": "dx_smoother_resample", "source": { "type": "binary", "amplitude": 0.0384 }, "scale":  384 }
+		]
+	}
+}

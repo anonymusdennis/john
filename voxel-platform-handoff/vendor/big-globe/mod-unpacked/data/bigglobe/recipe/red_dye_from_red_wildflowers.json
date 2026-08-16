@@ -1,0 +1,10 @@
+{
+	"type": "minecraft:crafting_shapeless",
+	"group": "red_dye",
+	"ingredients": [
+		"bigglobe:red_wildflowers"
+	],
+	"result": {
+		"id": "minecraft:red_dye"
+	}
+}

@@ -1,0 +1,157 @@
+{
+	"dimensions": {
+		"minecraft:overworld": {
+			"type": "bigglobe:overworld",
+			"generator": {
+				"type": "bigglobe:scripted",
+				"reload_dimension": "minecraft:overworld",
+				"height": {
+					"min_y": -1024,
+					"max_y":  1024,
+					"sea_level": 0
+				},
+				"world_traits": "bigglobe:overworld",
+				"layer": "bigglobe:overworld/root",
+				"feature_dispatcher": {
+					"rock_replacers": [
+						"bigglobe:overworld/bedrock",
+						"bigglobe:overworld/cobblestone_sprinkle",
+						"#bigglobe:overworld/ores"
+					],
+					"raw": "bigglobe:overworld/raw_root",
+					"normal": "bigglobe:overworld/normal_root"
+				},
+				"biome_source": {
+					"type": "bigglobe:scripted",
+					"script": "`bigglobe:overworld/biome`",
+					"all_possible_biomes": "#bigglobe:overworld_except_volcano"
+				},
+				"overriders": "#bigglobe:overworld",
+				"game_mechanics": {
+					"spawn_point": {
+						"file": "bigglobe:world_preset/overworld_spawn_point"
+					},
+					"mob_spawn_tweakers": "#bigglobe:overworld",
+					"colors": {
+						"grass": {
+							"source": "computeBiomeTint(false, 0.0I)",
+							"includes": "bigglobe:include/biome_tint"
+						},
+						"foliage": {
+							"source": "computeBiomeTint(true, 0.0I)",
+							"includes": "bigglobe:include/biome_tint"
+						},
+						"water": [
+							"float temperature = world_traits.`bigglobe:temperature_at` * 4.0I",
+							"temperature /= sqrt(temperature ^ 2 + 1.0I).as(float)",
+							"packI(63, roundInt(temperature * 64.0I + 128.0I), 255)"
+						]
+					},
+					"grass_bonemeal_feature": "bigglobe:overworld/grass_bonemeal",
+					"sound_modifier": {
+						"file": "bigglobe:world_preset/overworld_sound_modifier"
+					}
+				}
+			}
+		},
+
+
+
+		"minecraft:the_nether": {
+			"type": "bigglobe:nether",
+			"generator": {
+				"type": "bigglobe:scripted",
+				"reload_dimension": "minecraft:the_nether",
+				"height": {
+					"min_y": 0,
+					"max_y": 1024
+				},
+				"world_traits": "bigglobe:nether",
+				"layer": "bigglobe:nether/root",
+				"feature_dispatcher": {
+					"rock_replacers": [
+						"bigglobe:nether/lower_bedrock",
+						"bigglobe:nether/upper_bedrock",
+						"#bigglobe:nether/rock_layers",
+						"#bigglobe:nether/ores"
+					],
+					"raw": "bigglobe:nether/raw_root",
+					"normal": "bigglobe:nether/normal_root"
+				},
+				"biome_source": {
+					"type": "bigglobe:scripted",
+					"script": "`bigglobe:nether/bubble_type`.biome",
+					"all_possible_biomes": "#bigglobe:nether"
+				},
+				"overriders": "#bigglobe:nether",
+				"game_mechanics": {
+					"mob_spawn_tweakers": "#bigglobe:nether",
+					"nether": {
+						"place_portal_at_high_y_level": true,
+						"prevent_roof_exploration": true
+					},
+					"creaking_time_reference": "minecraft:overworld",
+					"lods": {
+						"view_distance_multiplier": 0.0625,
+						"fog_density_multiplier": 0.0625
+					},
+					"sound_modifier": {
+						"file": "bigglobe:world_preset/nether_sound_modifier"
+					}
+				}
+			}
+		},
+
+
+
+		"minecraft:the_end": {
+			"type": "bigglobe:end",
+			"generator": {
+				"type": "bigglobe:scripted",
+				"reload_dimension": "minecraft:the_end",
+				"height": {
+					"min_y": -512,
+					"max_y":  512
+				},
+				"world_traits": "bigglobe:end",
+				"layer": "bigglobe:end/root",
+				"feature_dispatcher": {
+					"rock_replacers": [
+						"#bigglobe:end/rock_layers",
+						"#bigglobe:end/ores"
+					],
+					"raw": "bigglobe:end/raw_root",
+					"normal": "bigglobe:end/normal_root"
+				},
+				"biome_source": {
+					"type": "bigglobe:scripted",
+					"script": "`bigglobe:end/surface`.biome",
+					"all_possible_biomes": "#bigglobe:end"
+				},
+				"overriders": "#bigglobe:end",
+				"game_mechanics": {
+					"mob_spawn_tweakers": "#bigglobe:end",
+					"end": {
+						"spawning": {
+							"location": [ 96, 67, 0 ],
+							"obsidian_platform": false
+						},
+						"inner_gateways": {
+							"radius": 84.0,
+							"height": 80
+						},
+						"outer_gateways": {
+							"min_radius": 512,
+							"max_radius": 4096,
+							"step": 32,
+							"condition": "`bigglobe:end/has_mountain`"
+						}
+					},
+					"sound_modifier": {
+						"file": "bigglobe:world_preset/end_sound_modifier"
+					}
+				}
+			}
+		}
+	}
+}

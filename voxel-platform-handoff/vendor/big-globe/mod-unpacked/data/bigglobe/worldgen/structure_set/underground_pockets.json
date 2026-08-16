@@ -1,0 +1,12 @@
+{
+	"placement": {
+		"type": "minecraft:random_spread",
+		"salt": 1586360275,
+		"separation": 3,
+		"spacing": 6
+	},
+	"structures": [
+		{ "weight": 100, "structure": "bigglobe:underground_pockets/water" },
+		{ "weight":  50, "structure": "bigglobe:underground_pockets/lava"  }
+	]
+}

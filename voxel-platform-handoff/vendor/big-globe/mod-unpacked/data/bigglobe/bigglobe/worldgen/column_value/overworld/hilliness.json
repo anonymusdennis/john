@@ -1,0 +1,8 @@
+{
+	"type": "script",
+	"params": {
+		"type": "double",
+		"is_3d": false
+	},
+	"script": "obelisk_terrain_suppression * (`raw/dx_heightmap` ^ 2 + `raw/dz_heightmap` ^ 2)"
+}

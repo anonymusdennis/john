@@ -1,0 +1,10 @@
+{
+	"replace": false,
+	"values": [
+		"bigglobe:nether/crimson_forest",
+		"bigglobe:nether/warped_forest",
+		"bigglobe:nether/ashen_wastes",
+		"bigglobe:nether/nether_wastes",
+		"bigglobe:nether/inferno"
+	]
+}

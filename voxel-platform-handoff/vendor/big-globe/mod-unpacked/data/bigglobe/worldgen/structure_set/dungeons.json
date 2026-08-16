@@ -1,0 +1,14 @@
+{
+	"placement": {
+		"type": "minecraft:random_spread",
+		"salt": 1995849322,
+		"separation": 8,
+		"spacing": 16,
+		"spread_type": "triangular"
+	},
+	"structures": [
+		{ "structure": "bigglobe:dungeons/small",  "weight": 1 },
+		{ "structure": "bigglobe:dungeons/medium", "weight": 1 },
+		{ "structure": "bigglobe:dungeons/large",  "weight": 1 }
+	]
+}

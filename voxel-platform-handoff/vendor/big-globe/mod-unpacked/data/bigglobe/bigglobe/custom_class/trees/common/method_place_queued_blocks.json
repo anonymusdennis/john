@@ -1,0 +1,20 @@
+{
+	"element_type": "method/normal",
+	"owner": "bigglobe:trees/common/class",
+	"name": "placeQueuedBlocks",
+	"return_type": "void",
+	"parameters": [],
+	"code": [
+		"for (BlockPos pos, BlockState state in otherBlocksToPlace:",
+			"setBlockState(pos.x, pos.y, pos.z, state)",
+		")",
+		"for (BlockPos pos, BlockState state in logsToPlace:",
+			"setBlockState(pos.x, pos.y, pos.z, state)",
+		")",
+		"for (BlockPos pos, BlockState state in leavesToPlace:",
+			"if (getBlockState(pos.x, pos.y, pos.z).isReplaceable():",
+				"setBlockState(pos.x, pos.y, pos.z, state)",
+			")",
+		")"
+	]
+}

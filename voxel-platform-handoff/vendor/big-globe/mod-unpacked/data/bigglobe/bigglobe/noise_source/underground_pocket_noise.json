@@ -1,0 +1,22 @@
+{
+	"dimensions": 2,
+	"type": "script",
+	"min": 0.0,
+	"max": 1.0,
+	"script": "1.0L / (fastExp(base) + 1.0L)",
+	"inputs": {
+		"base": {
+			"type": "change_range",
+			"min": -2.0,
+			"max":  4.0,
+			"grid": {
+				"type": "sum",
+				"layers": [
+					{ "type": "smooth", "scale": 16, "amplitude": 0.5 },
+					{ "type": "smooth", "scale":  8, "amplitude": 0.25 },
+					{ "type": "smooth", "scale":  4, "amplitude": 0.125 }
+				]
+			}
+		}
+	}
+}

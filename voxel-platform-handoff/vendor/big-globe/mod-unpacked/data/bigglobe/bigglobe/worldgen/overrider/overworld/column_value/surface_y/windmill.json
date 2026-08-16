@@ -1,0 +1,19 @@
+{
+	"type": "column_value",
+	"script": {
+		"source": [
+			"for (StructureStart start in structures:",
+				"double distance = distanceToCircle(start, 4.0L)",
+				"double mixLevel = smooth(distance * 0.0625L)",
+				"setSurfaceY(start.minY + 0.5L, mixLevel, setSnow)",
+			")"
+		],
+		"includes": [
+			"bigglobe:include/surface_manipulation"
+		]
+	},
+	"structure_filter": {
+		"structure": "bigglobe:windmill",
+		"radius_in_chunks": 1
+	}
+}

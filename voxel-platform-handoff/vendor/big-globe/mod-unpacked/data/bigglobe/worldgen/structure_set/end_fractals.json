@@ -1,0 +1,16 @@
+{
+	"placement": {
+		"type": "minecraft:random_spread",
+		"salt": 2117550406,
+		"separation": 24,
+		"spacing": 48
+	},
+	"structures": [
+		{ "weight": 1, "structure": "bigglobe:endger_sponge" },
+		{ "weight": 1, "structure": "bigglobe:cuboctahedron" },
+		{ "weight": 1, "structure": "bigglobe:snowflake"     },
+		{ "weight": 1, "structure": "bigglobe:octahedron"    },
+		{ "weight": 1, "structure": "bigglobe:tetrahedron"   },
+		{ "weight": 1, "structure": "bigglobe:endelisk"      }
+	]
+}

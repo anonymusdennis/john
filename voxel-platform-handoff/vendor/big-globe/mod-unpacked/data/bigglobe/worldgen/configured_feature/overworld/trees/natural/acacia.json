@@ -1,0 +1,44 @@
+{
+	"type": "bigglobe:natural_tree",
+	"config": {
+		"palette": "minecraft:acacia",
+		"height": "8.0L - 4.0L * max(world_traits.`bigglobe:foliage_at`, 0.0I) * fastLog2(max(random.nextDouble(), 2x1.0p-8L))",
+		"trunk": {
+			"type": "bigglobe:straight",
+			"thickness": "mixLinear(max(height * 0.09375L, minThickness), minThickness, fraction)",
+			"require_natural_ground": true,
+			"can_generate_in_liquid": false
+		},
+		"branches": {
+			"start_frac_y": { "type": "uniform", "min": 0.5, "max": 0.75 },
+			"count_per_layer": { "type": "uniform", "min": 4.0, "max": 8.0 },
+			"length_function": "fraction * random.nextDouble(1.5L, 2.0L)",
+			"height_function": "-0.25 * fraction ^ 2"
+		},
+		"decorations": {
+			"trunk": [
+				{ "type": "bigglobe:random_walk_leaves", "is_trunk": true },
+				{ "type": "bigglobe:adjacent_leaf", "chance": 0.25 }
+			],
+			"branches": [
+				{ "type": "bigglobe:random_walk_leaves", "is_trunk": false }
+			]
+		},
+		"ground_replacements": {
+			"minecraft:grass_block":     "minecraft:dirt",
+			"minecraft:podzol":          "minecraft:dirt",
+			"bigglobe:overgrown_podzol": "minecraft:dirt",
+			"minecraft:farmland":        "minecraft:dirt",
+			"minecraft:dirt":            "minecraft:dirt",
+			"minecraft:coarse_dirt":     "minecraft:coarse_dirt",
+			"minecraft:rooted_dirt":     "minecraft:rooted_dirt",
+			"minecraft:mud":             "minecraft:mud",
+			"minecraft:packed_mud":      "minecraft:packed_mud",
+			"minecraft:sand":            "minecraft:sand",
+			"minecraft:red_sand":        "minecraft:red_sand",
+			"bigglobe:overgrown_sand":   "minecraft:sand"
+		},
+		"delay_generation": true,
+		"max_radius_in_blocks": 32
+	}
+}

@@ -1,0 +1,10 @@
+{
+	"type": "bigglobe:script",
+	"config": {
+		"script": [
+			"ConeTreeGenerator",
+			".create(world, random, 'minecraft:spruce')",
+			".placeNatural(originX, originY, originZ)"
+		]
+	}
+}

@@ -1,0 +1,31 @@
+{
+	"type": "bigglobe:script",
+	"config": {
+		"script": [
+			"repeat (64:",
+				"double radius = random.nextDouble(4.0L)",
+				"double angle = random.nextDouble(tau)",
+				"int x = originX + roundInt(fastCos(angle) * radius)",
+				"int z = originZ + roundInt(fastSin(angle) * radius)",
+				"int y = originY + random.nextInt(-1, 2)",
+				"BlockState oldState = getBlockState(x, y, z)",
+				"BlockState newState = (",
+					"if (oldState.getBlock() ==. 'minecraft:air':",
+						"'bigglobe:short_chorus_spores'",
+					")",
+					"else if (oldState.getBlock() ==. 'bigglobe:short_chorus_spores':",
+						"'bigglobe:medium_chorus_spores'",
+					")",
+					"else if (oldState.getBlock() ==. 'bigglobe:medium_chorus_spores':",
+						"'bigglobe:tall_chorus_spores[half=lower]'",
+					")",
+					"else (",
+						"continue()",
+					")",
+				")",
+				"placeBlockState(x, y, z, newState)",
+			")",
+			"return(true)"
+		]
+	}
+}

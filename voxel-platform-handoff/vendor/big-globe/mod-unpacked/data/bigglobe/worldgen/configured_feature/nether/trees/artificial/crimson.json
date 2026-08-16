@@ -1,0 +1,33 @@
+{
+	"type": "bigglobe:artificial_tree",
+	"config": {
+		"palette": "minecraft:crimson",
+		"height": "max(random.roundInt(baseRadius * 8.0L), 4)",
+		"trunk": {
+			"type": "bigglobe:twisted",
+			"thickness": "mixLinear(max(height * 0.125L, minThickness), minThickness, fraction)",
+			"require_natural_ground": false,
+			"can_generate_in_liquid": false
+		},
+		"branches": {
+			"start_frac_y": { "type": "constant", "value": 0.5 },
+			"count_per_layer": { "type": "uniform", "min": 1.0, "max": 2.0 },
+			"length_function": "sqrt(1.0 - fraction ^ 2)",
+			"height_function": "fraction * (1.0 - fraction)"
+		},
+		"decorations": {
+			"ball_leaves": {
+				"inner_state": "minecraft:shroomlight"
+			}
+		},
+		"ground_replacements": {
+			"minecraft:crimson_nylium":  "minecraft:netherrack",
+			"minecraft:warped_nylium":   "minecraft:netherrack",
+			"bigglobe:ashen_netherrack": "minecraft:netherrack",
+			"minecraft:netherrack":      "minecraft:netherrack",
+			"minecraft:soul_sand":       "minecraft:soul_sand",
+			"minecraft:soul_soil":       "minecraft:soul_soil"
+		},
+		"max_saplings": "world_traits.`bigglobe:max_artificial_tree_saplings`"
+	}
+}

@@ -1,0 +1,15 @@
+{
+	"type": "minecraft:crafting_shaped",
+	"pattern": [
+		"sts",
+		" s ",
+		" s "
+	],
+	"key": {
+		"s": "#c:rods/wooden",
+		"t": "#c:strings"
+	},
+	"result": {
+		"id": "bigglobe:slingshot"
+	}
+}

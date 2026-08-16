@@ -1,0 +1,22 @@
+{
+	"type": "script",
+	"dispatcher": [
+		"for (int baseY in range[minModifiableY, maxModifiableY) % 16:",
+			"repeat (2:",
+				"int*(",
+					"x = minModifiableX | random.nextInt(16)",
+					"z = minModifiableZ | random.nextInt(16)",
+					"y = baseY | random.nextInt(16)",
+				")",
+				"if (",
+					"y.isBetween[",
+						"world_traits.`bigglobe:cave_min_y`(x, z),",
+						"world_traits.`bigglobe:cave_max_y`(x, z)",
+					")",
+				":",
+					"placeFeature(x, y, z, 'minecraft:glow_lichen')",
+				")",
+			")",
+		")"
+	]
+}

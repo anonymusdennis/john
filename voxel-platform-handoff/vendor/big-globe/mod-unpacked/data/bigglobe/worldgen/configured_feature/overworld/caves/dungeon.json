@@ -1,0 +1,12 @@
+{
+	"type": "bigglobe:script",
+	"config": {
+		"script": {
+			"template": "bigglobe:dungeon_feature",
+			"inputs": {
+				"STATE": "random.if ('minecraft:mossy_cobblestone') else ('minecraft:cobblestone')",
+				"ENTITY_TYPE": "random.nextBoolean() ? 'minecraft:skeleton' : 'minecraft:zombie'"
+			}
+		}
+	}
+}

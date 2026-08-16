@@ -1,0 +1,11 @@
+{
+	"replace": false,
+	"values": [
+		"#bigglobe:underground_pockets",
+		"bigglobe:core_spire",
+		"bigglobe:vanilla/ancient_city",
+		"minecraft:ancient_city",
+		"minecraft:trial_chambers",
+		"bigglobe:vanilla/trial_chambers"
+	]
+}

@@ -1,0 +1,24 @@
+{
+	"type": "bigglobe:ore",
+	"config": {
+		"seed": "copper",
+		"blocks": {
+			"#bigglobe:stone_ore_replaceables":     "minecraft:copper_ore",
+			"#bigglobe:deepslate_ore_replaceables": "minecraft:deepslate_copper_ore"
+		},
+		"chance": {
+			"template": "bigglobe:ores/exponential",
+			"inputs": {
+				"delay": "512.0L",
+				"peak":  "1.0L",
+				"limit": "0.0L"
+			}
+		},
+		"radius": {
+			"type": "average",
+			"min": 2.5,
+			"max": 8.0,
+			"average": 3.5
+		}
+	}
+}

@@ -1,0 +1,17 @@
+{
+	"type": "bigglobe:script",
+	"config": {
+		"script": [
+			"unless (random.nextBoolean(0.25): return(false))",
+			"int y = 0",
+			"while (--y,, random.nextBoolean() && getBlockState(0, y, 0).isAir():",
+				"setBlockState(0, y, 0, 'minecraft:weeping_vines_plant')",
+			")",
+			"++y",
+			"if (getBlockState(0, y, 0) ==. 'minecraft:weeping_vines_plant':",
+				"setBlockState(0, y, 0, 'minecraft:weeping_vines[age=25]')",
+			")",
+			"return(true)"
+		]
+	}
+}

@@ -117,11 +117,11 @@ Big Globe renders far terrain preview without full chunk gen. Consider similar L
 
 Smart AI decides whether to use separate scenes, Y-offset regions, or dimension portals.
 
-## Fetch vendored refs
+## Refresh vendored refs
 
 ```bash
-cd /home/headadmin/Documents/projects/john
-./voxel-platform-handoff/scripts/fetch_big_globe_refs.sh
+./voxel-platform-handoff/scripts/fetch_big_globe_refs.sh   # docs from scriptable-generators
+./voxel-platform-handoff/scripts/fetch_mod.sh            # release JAR + unpack
 ```
 
 See [08-DOWNLOAD-MANIFEST.md](08-DOWNLOAD-MANIFEST.md) for all URLs.

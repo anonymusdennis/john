@@ -1,0 +1,5 @@
+{
+	"type": "bigglobe:delegating",
+	"delegate": "minecraft:bastion_remnant",
+	"biomes": "#bigglobe:has_structure/vanilla/bastion_remnant"
+}
