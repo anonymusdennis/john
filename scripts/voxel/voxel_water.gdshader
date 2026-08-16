@@ -1,5 +1,5 @@
 shader_type spatial;
-render_mode blend_mix, depth_draw_opaque, cull_disabled, specular_schlick_ggx;
+render_mode blend_mix, depth_draw_never, cull_disabled, specular_schlick_ggx;
 // Simple stylized water surface for ocean/river planes.
 // Static volume — no simulation. Gentle normal wobble + depth-tinted fresnel.
 

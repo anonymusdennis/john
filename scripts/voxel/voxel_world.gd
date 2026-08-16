@@ -165,14 +165,18 @@ func _prepare_stream() -> Variant:
 
 	DirAccess.make_dir_recursive_absolute(USER_DIR)
 	var reset := "--voxel-reset" in OS.get_cmdline_user_args()
+	var db_path := USER_DB_PATH
 	if reset or not FileAccess.file_exists(USER_DB_PATH):
-		if not _copy_file(BAKED_DB_PATH, USER_DB_PATH):
-			push_warning("[VoxelWorld] Failed to copy baked world to user:// — playing read-only from res:// will not persist edits")
-			return null
-		print("[VoxelWorld] Baked world copied to ", USER_DB_PATH)
+		if _copy_file(BAKED_DB_PATH, USER_DB_PATH):
+			print("[VoxelWorld] Baked world copied to ", USER_DB_PATH)
+		else:
+			# Last resort: open the shipped database in place. Works in dev /
+			# unpacked installs; player edits may not persist across updates.
+			push_warning("[VoxelWorld] Failed to copy baked world to user:// — opening %s directly (edits may not persist)" % BAKED_DB_PATH)
+			db_path = BAKED_DB_PATH
 
 	var stream: Variant = ClassDB.instantiate("VoxelStreamSQLite")
-	stream.database_path = USER_DB_PATH
+	stream.database_path = db_path
 	return stream
 
 
