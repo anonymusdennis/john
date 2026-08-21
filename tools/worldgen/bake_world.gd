@@ -18,13 +18,11 @@ extends SceneTree
 ##
 ## Stock-Godot safe (duck-typed voxel classes) — it just refuses politely.
 
-const BGModel := preload("res://tools/worldgen/bg_model.gd")
-
 const BLOCK := 16
 const FLUSH_EVERY := 4096
-const META_VERSION := 1
+const META_VERSION := 2
 
-var _model: RefCounted
+var _model: TerrainModel
 var _stream: Variant
 var _out_dir := "res://world"
 var _cfg: Dictionary = {}
@@ -36,7 +34,7 @@ func _initialize() -> void:
 
 
 func _run() -> int:
-	print("=== John voxel world baker (Big Globe-inspired) ===")
+	print("=== John voxel world baker (steered fantasy terrain) ===")
 	if not ClassDB.class_exists("VoxelStreamSQLite") or not ClassDB.class_exists("VoxelBuffer"):
 		printerr("This Godot build has no godot_voxel module — cannot bake.")
 		printerr("Build/download a voxel-enabled Godot first (see voxel-platform-handoff/IMPLEMENTATION-NOTES.md).")
@@ -61,7 +59,7 @@ func _run() -> int:
 	if not lods_override.is_empty():
 		_cfg["lods"] = int(lods_override)
 
-	_model = BGModel.new()
+	_model = TerrainModel.new()
 	_model.configure(_cfg)
 	_out_dir = String(_cfg.get("out_dir", "res://world"))
 	DirAccess.make_dir_recursive_absolute(_out_dir)
@@ -192,7 +190,8 @@ func _write_meta() -> void:
 			"size": [b.size.x, b.size.y, b.size.z],
 		},
 		"sea_level": _model.sea_level,
-		"core_top_y": _model.core_top_y,
+		"bedrock_top_y": _model.bedrock_top_y,
+		"config": _model.config_dict(),
 		"lods": int(_cfg.get("lods", 5)),
 		"spawn": [spawn.x, spawn.y, spawn.z],
 		"water_tiles": tiles,

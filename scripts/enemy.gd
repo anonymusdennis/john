@@ -147,6 +147,7 @@ var _launched_time: float = 0.0
 var _jump_fail_streak: int = 0
 var _graph_fail_streak: int = 0             ## Consecutive empty chase-path results.
 var _graph_fail_time: float = 0.0           ## When the last empty result landed.
+var _fall_floor_y: float = -1e9             ## World floor; below it = fell out.
 
 
 func _ready() -> void:
@@ -159,6 +160,7 @@ func _ready() -> void:
 	_mass = body_mass_override if body_mass_override > 0.0 else _derived_mass()
 	_desired_fwd = -global_transform.basis.z
 	_repath_timer = randf()   # Staggers repaths across the population.
+	_resolve_fall_floor()
 
 	_profile = NavAgentProfile.for_plan(animator.plan)
 	_profile.max_step = max_step_height
@@ -197,6 +199,8 @@ func _fit_collider() -> void:
 
 
 func _physics_process(delta: float) -> void:
+	if _check_fall_guard():
+		return
 	_attack_cd = maxf(_attack_cd - delta, 0.0)
 	_hop_cd = maxf(_hop_cd - delta, 0.0)
 	_repath_timer = maxf(_repath_timer - delta, 0.0)
@@ -290,6 +294,31 @@ func _update_lod() -> bool:
 		_sleeping = false
 		animator.set_physics_process(true)
 	return false
+
+
+## World floor: the voxel world has an indestructible bedrock slab; the legacy
+## flat map has nothing below 0. Resolved once at spawn.
+func _resolve_fall_floor() -> void:
+	_fall_floor_y = -60.0
+	var voxel := get_tree().get_first_node_in_group("voxel_world")
+	if voxel != null and voxel.has_method("is_active") and voxel.is_active() \
+			and voxel.model() != null:
+		_fall_floor_y = float(voxel.model().bedrock_top_y)
+
+
+## Fall guard: an enemy that slips out of the world (carved hole, missing
+## collision, launch mishap) used to fall forever while its AI kept firing
+## raycasts every frame — a big freeze contributor. Teleport it home instead.
+func _check_fall_guard() -> bool:
+	if global_position.y > _fall_floor_y - 4.0:
+		return false
+	global_position = home_position + Vector3.UP * 1.0
+	velocity = Vector3.ZERO
+	_ext_vel = Vector3.ZERO
+	_state = State.CHASE
+	_path.clear()
+	_path_pending = false
+	return true
 
 
 ## Something (player or another body) is standing on this enemy — skip heavy
@@ -542,7 +571,7 @@ func _steer_move(target: Vector3, delta: float, speed_scale: float = 1.0) -> voi
 	_track_stuck(delta, dist)
 
 
-func _idle_move(delta: float) -> void:
+func _idle_move(_delta: float) -> void:
 	if not _on_wall_surface():
 		velocity.x = _ext_vel.x
 		velocity.z = _ext_vel.z

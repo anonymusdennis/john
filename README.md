@@ -150,4 +150,32 @@ scripts/anim/proc_body_builder.gd  Runtime skeleton + visuals generator
 scripts/anim/proc_animator.gd      Gait, spine, head, arms, tail solver
 scripts/anim/proc_leg.gd           Planted-foot stepping state
 scripts/anim/proc_ik.gd            Two-bone IK + rotation helpers
+scripts/voxel/voxel_world.gd       Voxel terrain host + carve/place/paint API
+scripts/voxel/terrain_model.gd     Steered fantasy terrain math (see below)
+scripts/voxel/vegetation.gd        Streamed grass + realistic mesh trees
+scripts/voxel/block_registry.gd    Block catalog → 16 material channels
+tools/worldgen/                    Offline baker + live dev generator
 ```
+
+## Voxel fantasy terrain
+
+With a [godot_voxel](https://github.com/Zylann/godot_voxel)-enabled build the
+flat ground is replaced by a **steered, Skyrim-style fantasy landscape**
+(`scripts/voxel/terrain_model.gd` — plain noise-stacking is deliberately out):
+
+- A **flat hub vale** at the center holds the entire playground; beyond its rim
+  the wilderness takes over.
+- **Ridged mountain ranges** with domain warping — knife crests, shoulders and
+  terraced benches, crag overhangs on steep faces, natural nooks everywhere.
+- **Pass corridors** connect regions so everything is walkable on foot.
+- **Empty glades and lake clearings** are left intentionally blank as build
+  sites for mappers — nothing is fabricated there.
+- **Materials steer by slope, altitude and moisture**: meadow grass, moss,
+  dirt, gravel scree, bare stone, snowcaps, sand shores, terracotta strata.
+- **Grass tufts sway in the wind** and **trees are real meshes** (oaks and
+  pines with trunks, branches and foliage crowns — not voxel blocks),
+  streamed in around the player with trunk collision.
+- The world is **shallow with an indestructible bedrock slab** a few dozen
+  meters down — no bottomless caves, no falling out of the world.
+
+Without the voxel module the game still runs on the legacy flat ground.

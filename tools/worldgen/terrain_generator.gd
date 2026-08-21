@@ -1,19 +1,20 @@
 extends VoxelGeneratorScript
-## Dev-only live generator adapter for the Big Globe-inspired world model.
+## Dev-only live generator adapter for the steered fantasy TerrainModel.
 ##
 ## NOTE: this file extends VoxelGeneratorScript and therefore only parses on a
 ## Godot build that includes the godot_voxel module. It lives in tools/ (which
 ## is excluded from exports) and is only ever load()-ed:
 ##  - by scripts/voxel/voxel_world.gd when no baked world exists (live dev gen)
-##  - by tools/worldgen/bake_world.gd conceptually (the baker uses BGModel
+##  - by tools/worldgen/bake_world.gd conceptually (the baker uses the model
 ##    directly, this adapter is for in-editor flying around while tuning)
 ##
-## All actual generation math lives in bg_model.gd (stock-Godot safe).
+## All actual generation math lives in scripts/voxel/terrain_model.gd
+## (stock-Godot safe, shipped — the runtime also uses it for vegetation,
+## spawn snapping and nav bounds).
 
-const BGModel := preload("res://tools/worldgen/bg_model.gd")
 const CONFIG_PATH := "res://tools/worldgen/bake_config.json"
 
-var model: RefCounted = BGModel.new()
+var model: TerrainModel = TerrainModel.new()
 
 
 func configure_defaults() -> void:
