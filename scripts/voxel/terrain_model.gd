@@ -523,6 +523,8 @@ func fill_block(buffer: Variant, origin: Vector3i, lod: int, cache: Dictionary) 
 					continue
 				ring_min = minf(ring_min,
 						height_at(origin.x + i * step, origin.z + k * step, cache))
+			# Once a rim row disproves the shortcut, stop sampling — the final
+			# re-check below then routes this block to the full walk instead.
 			if block_top > ring_min - 10.0 * float(step):
 				break
 		if block_top <= ring_min - 10.0 * float(step):

@@ -159,6 +159,10 @@ void fragment() {
 		fine = fbm2(dp);
 		// Procedural bump: forward-difference gradient of the detail noise,
 		// projected onto the surface, gives real lit relief up close.
+		// Sampled at 2x the albedo grain frequency so the relief reads finer
+		// than the color mottling. eps is deliberately wide (value_noise cells
+		// are ~1 unit): it low-pass filters the slope, giving stable, broad
+		// bumps instead of per-texel shimmer under camera motion.
 		vec3 bp = dp * 2.0;
 		float b0 = value_noise(bp);
 		const float eps = 0.45;
