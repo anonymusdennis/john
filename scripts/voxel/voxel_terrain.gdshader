@@ -26,6 +26,17 @@ uniform vec4 u_albedo[16];
 // x = roughness, y = detail noise scale, z = detail noise strength
 uniform vec3 u_params[16];
 
+// --- Detail tuning --------------------------------------------------------------
+// Fine detail (albedo grain + procedural bump) is full-strength inside
+// u_detail_fade_start and gone past u_detail_fade_end. Beyond the fade the
+// noise taps are skipped entirely — distant terrain covers most pixels in a
+// vista, so this both removes far-field shimmer and cuts fragment cost.
+group_uniforms detail;
+uniform float u_detail_fade_start : hint_range(8.0, 256.0) = 48.0;
+uniform float u_detail_fade_end : hint_range(16.0, 512.0) = 160.0;
+uniform float u_bump_strength : hint_range(0.0, 2.0) = 0.6;
+group_uniforms;
+
 varying vec3 v_world_pos;
 varying vec3 v_world_normal;
 varying vec4 v_indices;
@@ -103,33 +114,74 @@ void fragment() {
 	vec4 w = v_weights;
 	w /= (w.x + w.y + w.z + w.w + 0.00001);
 
-	// Blend the 4 candidate materials of this fragment.
-	vec3 albedo = vec3(0.0);
-	float roughness = 0.0;
-	float detail_scale = 0.0;
-	float detail_strength = 0.0;
-	for (int i = 0; i < 4; i++) {
-		int idx = clamp(int(v_indices[i] + 0.5), 0, CHANNEL_COUNT - 1);
-		float wi = w[i];
-		albedo += u_albedo[idx].rgb * wi;
-		roughness += u_params[idx].x * wi;
-		detail_scale += u_params[idx].y * wi;
-		detail_strength += u_params[idx].z * wi;
+	// Blend the candidate materials of this fragment. Baked voxels carry a
+	// single 100% material almost everywhere (blends only appear near paint
+	// edits and material borders), so take a coherent single-material fast
+	// path and only run the 4-way blend where weights actually mix.
+	vec3 albedo;
+	float roughness;
+	float detail_scale;
+	float detail_strength;
+	int idx0 = clamp(int(v_indices.x + 0.5), 0, CHANNEL_COUNT - 1);
+	if (w.x > 0.996) {
+		albedo = u_albedo[idx0].rgb;
+		roughness = u_params[idx0].x;
+		detail_scale = u_params[idx0].y;
+		detail_strength = u_params[idx0].z;
+	} else {
+		albedo = vec3(0.0);
+		roughness = 0.0;
+		detail_scale = 0.0;
+		detail_strength = 0.0;
+		for (int i = 0; i < 4; i++) {
+			int idx = clamp(int(v_indices[i] + 0.5), 0, CHANNEL_COUNT - 1);
+			float wi = w[i];
+			albedo += u_albedo[idx].rgb * wi;
+			roughness += u_params[idx].x * wi;
+			detail_scale += u_params[idx].y * wi;
+			detail_strength += u_params[idx].z * wi;
+		}
 	}
 
-	// Two-scale procedural variation: fine grain + large low-frequency patches
-	// that break tiling at Space Engineers scales.
-	float fine = fbm2(v_world_pos * detail_scale);
+	// Distance-faded detail: VERTEX is view-space in fragment(), so its length
+	// is the exact camera distance. Far fragments skip every noise tap.
+	float view_dist = length(VERTEX);
+	float detail_fade = 1.0 - smoothstep(u_detail_fade_start, u_detail_fade_end, view_dist);
+
+	// Large low-frequency patches always apply — they are what breaks tiling
+	// on distant slopes and stay stable (no shimmer) at any range.
 	float macro = value_noise(v_world_pos * 0.02);
-	float shade = 1.0 + (fine - 0.5) * 2.0 * detail_strength + (macro - 0.5) * 0.18;
+	float fine = 0.5;
+	vec3 world_n = normalize(v_world_normal);
+
+	if (detail_fade > 0.001) {
+		vec3 dp = v_world_pos * detail_scale;
+		fine = fbm2(dp);
+		// Procedural bump: forward-difference gradient of the detail noise,
+		// projected onto the surface, gives real lit relief up close.
+		vec3 bp = dp * 2.0;
+		float b0 = value_noise(bp);
+		const float eps = 0.45;
+		vec3 grad = vec3(
+				value_noise(bp + vec3(eps, 0.0, 0.0)) - b0,
+				value_noise(bp + vec3(0.0, eps, 0.0)) - b0,
+				value_noise(bp + vec3(0.0, 0.0, eps)) - b0) / eps;
+		grad -= world_n * dot(grad, world_n);
+		world_n = normalize(world_n - grad * (detail_strength * u_bump_strength * detail_fade));
+	}
+
+	// Two-scale procedural variation: fine grain (near only) + macro patches.
+	float shade = 1.0 + (fine - 0.5) * 2.0 * detail_strength * detail_fade
+			+ (macro - 0.5) * 0.18;
 	albedo *= shade;
 
 	// Subtle cavity/ledge accent: horizontal surfaces get a hint of dust,
 	// steep faces read slightly darker and rockier.
-	float up = clamp(v_world_normal.y, 0.0, 1.0);
+	float up = clamp(world_n.y, 0.0, 1.0);
 	albedo *= mix(0.86, 1.06, up);
-	roughness = clamp(roughness + (fine - 0.5) * 0.18, 0.05, 1.0);
+	roughness = clamp(roughness + (fine - 0.5) * 0.18 * detail_fade, 0.05, 1.0);
 
+	NORMAL = normalize((VIEW_MATRIX * vec4(world_n, 0.0)).xyz);
 	ALBEDO = albedo;
 	ROUGHNESS = roughness;
 	METALLIC = 0.0;

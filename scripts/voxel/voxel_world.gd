@@ -33,6 +33,12 @@ const TERRAIN_COLLISION_LAYER := 33
 @export var lod_count: int = 5
 @export var lod_distance: float = 64.0
 @export var view_distance: int = 512
+## 32³ mesh blocks quarter the draw-call count of the default 16³ — the main
+## renderer win for large view distances (recommended by godot_voxel for LOD
+## terrains).
+@export var mesh_block_size: int = 32
+## Cross-fades mesh blocks when LODs swap instead of popping.
+@export var lod_fade_duration: float = 0.3
 ## Collision must reach the far feature zones (±180 m ⇒ ~255 m corners) so the
 ## nav graph can sample terrain under ALL districts, not just near the spawn.
 @export var collision_view_distance: int = 272
@@ -295,6 +301,14 @@ func _build_terrain(stream: Variant, generator: Variant) -> void:
 	_terrain.lod_distance = lod_distance
 	if "view_distance" in _terrain:
 		_terrain.view_distance = view_distance
+	# Rendering-efficiency knobs (guarded — property sets differ per module
+	# version, and everything here is duck-typed for stock-Godot safety).
+	if "mesh_block_size" in _terrain:
+		_terrain.mesh_block_size = mesh_block_size
+	if "lod_fade_duration" in _terrain:
+		_terrain.lod_fade_duration = lod_fade_duration
+	if "threaded_update_enabled" in _terrain:
+		_terrain.threaded_update_enabled = true
 	_terrain.voxel_bounds = _bounds()
 	_terrain.generate_collisions = true
 	_terrain.collision_layer = TERRAIN_COLLISION_LAYER

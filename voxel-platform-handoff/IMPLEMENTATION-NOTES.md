@@ -130,6 +130,14 @@ maps onto those channels (`ID_CHANNEL_OVERRIDES` + category fallback).
 - Terrain collision uses layers **1 (world) + 32 (nav_surface)** so NavGraph
   column sampling keeps working on voxel ground. `voxel_edited` signal is emitted
   after every carve/place for future nav refresh hooks.
+- **Rendering/detail tuning:** the terrain uses 32³ mesh blocks and LOD
+  cross-fading (`mesh_block_size` / `lod_fade_duration` exports on `VoxelWorld`,
+  set with duck-typed guards). The terrain shader adds procedural bump detail
+  near the camera and fades all fine detail noise out with distance
+  (`u_detail_fade_start/end`, `u_bump_strength`) — distant fragments skip the
+  noise taps entirely. Generation skips crag displacement past LOD 1 (sub-voxel
+  there) and uniform-fills deep solid LOD 1+ blocks. Trees and grass cells fade
+  out at their streaming radius via visibility ranges instead of popping.
 - **Build mode (B):** LMB carve sphere, RMB place sphere (SDF add + Mixel4 texture
   paint), R cycles material, wheel resizes brush (1.5–6 m), ghost preview + HUD.
   Player punching/item-use is suppressed via the `build_mode_active` meta flag.
@@ -158,4 +166,5 @@ maps onto those channels (`ID_CHANNEL_OVERRIDES` + category fallback).
   floating until its cell restreams.
 - NavGraph re-bake after mining is hooked only via the `voxel_edited` signal;
   wire it to `nav_graph.configure()` throttled if enemies need to path into mines.
-- `VoxelViewer.view_distance` and `lod_distance` are conservative; tune per rig.
+- `VoxelViewer.view_distance`, `lod_distance` and the shader's detail-fade
+  ranges are conservative; tune per rig.

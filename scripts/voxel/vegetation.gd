@@ -167,6 +167,12 @@ func _build_tree_cell(key: Vector2i) -> Node3D:
 		mi.transform = Transform3D(
 			Basis(Vector3.UP, rng.randf() * TAU).scaled(Vector3.ONE * s),
 			pos - Vector3.UP * 0.35)
+		# Far trees fade out instead of popping at the stream boundary; cells
+		# past TREE_RADIUS linger until the free margin, so this also culls
+		# their draws while the nodes are still alive.
+		mi.visibility_range_end = TREE_RADIUS + TREE_CELL
+		mi.visibility_range_end_margin = TREE_CELL * 0.5
+		mi.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
 		container.add_child(mi)
 
 		var body := StaticBody3D.new()
@@ -229,13 +235,27 @@ func _build_grass_cell(key: Vector2i) -> Node3D:
 	mm.use_colors = true
 	mm.mesh = _grass_mesh
 	mm.instance_count = transforms.size()
+	# Re-origin the cell at its tufts' centroid so distance-based visibility
+	# ranges measure from the grass itself (instance transforms are stored
+	# relative to the node, keeping world positions identical).
+	var centroid := Vector3.ZERO
+	for t in transforms:
+		centroid += t.origin
+	centroid /= float(transforms.size())
 	for i in transforms.size():
-		mm.set_instance_transform(i, transforms[i])
+		var t := transforms[i]
+		t.origin -= centroid
+		mm.set_instance_transform(i, t)
 		mm.set_instance_color(i, colors[i])
 	var mmi := MultiMeshInstance3D.new()
 	mmi.multimesh = mm
 	mmi.material_override = _grass_mat
 	mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	mmi.position = centroid
+	# Fade whole cells out at the streaming edge instead of popping.
+	mmi.visibility_range_end = GRASS_RADIUS + GRASS_CELL
+	mmi.visibility_range_end_margin = GRASS_CELL * 0.75
+	mmi.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
 	container.add_child(mmi)
 	return container
 

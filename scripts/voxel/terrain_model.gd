@@ -505,6 +505,16 @@ func fill_block(buffer: Variant, origin: Vector3i, lod: int, cache: Dictionary) 
 			max_h = maxf(max_h, col["h"])
 			min_h = minf(min_h, col["h"])
 
+	# Whole block deep inside solid ground → every SDF sample clamps to -1
+	# (|y - h| ≥ 10·step, past crag/boulder reach) so no isosurface can cross
+	# it. LOD 1+ blocks are never mined, so a uniform rock fill is exact and
+	# skips the whole per-voxel walk. LOD 0 keeps full materials for mining.
+	if lod >= 1 and block_top <= min_h - 10.0 * float(step):
+		buffer.fill_f(-1.0, CH_SDF)
+		buffer.fill(pack_single_index(R.STONE), CH_INDICES)
+		buffer.fill(WEIGHTS_SINGLE_PACKED, CH_WEIGHTS)
+		return
+
 	# Boulders only matter at fine LODs and near the surface band.
 	var feats: Array = []
 	if lod <= 1 and block_top > min_h - 2.0 and block_bottom < max_h + 8.0:
@@ -512,7 +522,10 @@ func fill_block(buffer: Variant, origin: Vector3i, lod: int, cache: Dictionary) 
 				origin.x + BLOCK_SIZE * step, origin.z + BLOCK_SIZE * step, cache):
 			if f["type"] == "boulder":
 				feats.append(f)
-	var crag_amp := 2.6
+	# Crag displacement is sub-voxel past LOD 1 — there it only aliases the
+	# distant meshes while costing a full 3D-noise lattice, so gate it off.
+	var crags_on := lod <= 1
+	var crag_amp := 2.6 if crags_on else 0.0
 	var top_needed := max_h + crag_amp + 2.0 * step
 	for f: Dictionary in feats:
 		top_needed = maxf(top_needed, float(f["top"]) + 2.0 * step)
@@ -529,9 +542,11 @@ func fill_block(buffer: Variant, origin: Vector3i, lod: int, cache: Dictionary) 
 
 	# 3D noise lattice (stride 4 cells), trilinearly interpolated per voxel.
 	var lat_step := 4 * step
-	var l_crag := PackedFloat32Array(); l_crag.resize(LATTICE_N * LATTICE_N * LATTICE_N)
-	var l_pocket := PackedFloat32Array(); l_pocket.resize(l_crag.size())
-	var l_strata := PackedFloat32Array(); l_strata.resize(l_crag.size())
+	var l_crag := PackedFloat32Array()
+	if crags_on:
+		l_crag.resize(LATTICE_N * LATTICE_N * LATTICE_N)
+	var l_pocket := PackedFloat32Array(); l_pocket.resize(LATTICE_N * LATTICE_N * LATTICE_N)
+	var l_strata := PackedFloat32Array(); l_strata.resize(l_pocket.size())
 	var idx := 0
 	for lj in LATTICE_N:
 		var ly := origin.y + lj * lat_step
@@ -539,7 +554,8 @@ func fill_block(buffer: Variant, origin: Vector3i, lod: int, cache: Dictionary) 
 			var lz := origin.z + lk * lat_step
 			for li in LATTICE_N:
 				var lx := origin.x + li * lat_step
-				l_crag[idx] = _n_crag.get_noise_3d(lx, ly, lz)
+				if crags_on:
+					l_crag[idx] = _n_crag.get_noise_3d(lx, ly, lz)
 				l_pocket[idx] = _n_pocket.get_noise_3d(lx, ly, lz)
 				l_strata[idx] = _n_strata.get_noise_3d(lx, ly, lz)
 				idx += 1
@@ -568,7 +584,7 @@ func fill_block(buffer: Variant, origin: Vector3i, lod: int, cache: Dictionary) 
 			# Crags only on steep wild faces — flats and the vale stay clean
 			# so navigation and building keep working.
 			var crag_gate := 0.0
-			if not surf.is_empty():
+			if crags_on and not surf.is_empty():
 				crag_gate = smoothstep(0.7, 1.3, float(surf["grad"])) \
 						* wildness(wx, wz) * crag_amp
 
