@@ -509,11 +509,27 @@ func fill_block(buffer: Variant, origin: Vector3i, lod: int, cache: Dictionary) 
 	# (|y - h| ≥ 10·step, past crag/boulder reach) so no isosurface can cross
 	# it. LOD 1+ blocks are never mined, so a uniform rock fill is exact and
 	# skips the whole per-voxel walk. LOD 0 keeps full materials for mining.
+	# Rim safety: neighbor meshers read a few padding voxels from this block,
+	# so also require the terrain just outside the footprint to stay well
+	# above — then no mesh cell touching these voxels can hold an isosurface
+	# and the uniform material is provably never sampled.
 	if lod >= 1 and block_top <= min_h - 10.0 * float(step):
-		buffer.fill_f(-1.0, CH_SDF)
-		buffer.fill(pack_single_index(R.STONE), CH_INDICES)
-		buffer.fill(WEIGHTS_SINGLE_PACKED, CH_WEIGHTS)
-		return
+		var ring_min := min_h
+		var lo := -3
+		var hi := BLOCK_SIZE + 3
+		for k in range(lo, hi):
+			for i in range(lo, hi):
+				if k >= 0 and k < BLOCK_SIZE and i >= 0 and i < BLOCK_SIZE:
+					continue
+				ring_min = minf(ring_min,
+						height_at(origin.x + i * step, origin.z + k * step, cache))
+			if block_top > ring_min - 10.0 * float(step):
+				break
+		if block_top <= ring_min - 10.0 * float(step):
+			buffer.fill_f(-1.0, CH_SDF)
+			buffer.fill(pack_single_index(R.STONE), CH_INDICES)
+			buffer.fill(WEIGHTS_SINGLE_PACKED, CH_WEIGHTS)
+			return
 
 	# Boulders only matter at fine LODs and near the surface band.
 	var feats: Array = []
